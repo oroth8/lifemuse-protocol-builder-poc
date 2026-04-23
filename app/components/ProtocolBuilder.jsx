@@ -111,9 +111,9 @@ let idC = 1000;
 const gid = () => `i-${idC++}`;
 
 const V = {
-  bg: "#0F1117", bgCard: "#181B24", bgHover: "#1E222D", bgInput: "#12141B",
-  bdr: "#2A2E3A", bdrFocus: "#5B5FED", tx: "#E8E9ED", txM: "#8B8FA3", txD: "#565B6E",
-  acc: "#5B5FED", danger: "#E24B4A", dangerBg: "#2A1515", success: "#1D9E75", warn: "#BA7517",
+  bg: "#F7F8FC", bgCard: "#FFFFFF", bgHover: "#F3F5FB", bgInput: "#FFFFFF",
+  bdr: "#D8DDEA", bdrFocus: "#5B5FED", tx: "#1B2230", txM: "#5E6980", txD: "#8A93A6",
+  acc: "#5B5FED", danger: "#D14343", dangerBg: "#FCEBEC", success: "#1D9E75", warn: "#BA7517",
 };
 const F = `"Instrument Sans","DM Sans",-apple-system,sans-serif`;
 const M = `"JetBrains Mono","SF Mono",monospace`;
@@ -142,7 +142,7 @@ const S = {
   tag: (c) => ({ fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 4, background: `${c}20`, color: c }),
   iRow: { display: "flex", alignItems: "flex-start", gap: 12, padding: "12px 14px", background: V.bgInput, borderRadius: 8, marginBottom: 8, border: `1px solid ${V.bdr}` },
   empty: { padding: "32px 18px", textAlign: "center", color: V.txD, fontSize: 13 },
-  modal: { position: "fixed", inset: 0, background: "rgba(0,0,0,.65)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 20 },
+  modal: { position: "fixed", inset: 0, background: "rgba(15, 23, 42, .18)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 20 },
   modalC: { background: V.bgCard, border: `1px solid ${V.bdr}`, borderRadius: 14, width: "100%", maxWidth: 620, maxHeight: "80vh", overflow: "auto" },
   modalH: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px", borderBottom: `1px solid ${V.bdr}` },
   modalB: { padding: "18px 20px" },
