@@ -1,5 +1,5 @@
-import ProtocolBuilder from "./components/ProtocolBuilder";
+import { redirect } from "next/navigation";
 
 export default function Home() {
-  return <ProtocolBuilder />;
+  redirect("/dashboard");
 }

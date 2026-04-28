@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 
 const PILLARS = {
@@ -121,6 +122,7 @@ const M = `"JetBrains Mono","SF Mono",monospace`;
 const S = {
   root: { fontFamily: F, background: V.bg, color: V.tx, minHeight: "100vh" },
   topBar: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 28px", borderBottom: `1px solid ${V.bdr}`, background: V.bgCard, position: "sticky", top: 0, zIndex: 50 },
+  backBtn: { display: "inline-flex", alignItems: "center", justifyContent: "center", width: 36, height: 36, borderRadius: 8, border: `1px solid ${V.bdr}`, background: V.bgCard, color: V.txM, textDecoration: "none", flexShrink: 0 },
   btnP: { background: V.acc, color: "#fff", border: "none", borderRadius: 8, padding: "8px 18px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: F },
   btnS: { background: "transparent", color: V.txM, border: `1px solid ${V.bdr}`, borderRadius: 8, padding: "8px 18px", fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: F },
   btnG: { background: "transparent", color: V.txM, border: "none", padding: "6px 12px", fontSize: 13, cursor: "pointer", fontFamily: F, borderRadius: 6 },
@@ -943,10 +945,17 @@ export default function ProtocolBuilder() {
   return (
     <div style={S.root}>
       <div style={S.topBar}>
-        <div>
-          <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: "-0.01em" }}>Protocol builder</div>
-          <div style={{ fontSize: 12, color: V.txM, marginTop: 2 }}>
-            {meta.name || "Untitled protocol"} · <span style={S.badge(V.warn)}>{meta.status}</span> · {total} items · {sections.length} sections
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <Link href="/protocols" aria-label="Back to protocols" style={S.backBtn}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M15 18l-6-6 6-6" />
+            </svg>
+          </Link>
+          <div>
+            <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: "-0.01em" }}>Protocol builder</div>
+            <div style={{ fontSize: 12, color: V.txM, marginTop: 2 }}>
+              {meta.name || "Untitled protocol"} · <span style={S.badge(V.warn)}>{meta.status}</span> · {total} items · {sections.length} sections
+            </div>
           </div>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
