@@ -2,19 +2,19 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { DEFAULT_SUPPLEMENT_ICON_ID, SupplementIconGlyph, SupplementIconPickerModal } from "./protocolSupplementIcons";
 
 const PILLARS = {
-  supplements: { label: "Supplements", icon: "💊", color: "#7F77DD" },
-  nutrition: { label: "Nutrition", icon: "🥗", color: "#1D9E75" },
-  training: { label: "Training", icon: "🏋️", color: "#D85A30" },
-  regeneration: { label: "Regeneration", icon: "♻️", color: "#378ADD" },
-  recovery: { label: "Recovery", icon: "🧊", color: "#D4537E" },
-  diagnostics: { label: "Diagnostics", icon: "🔬", color: "#BA7517" },
+  supplements: { label: "Supplements", color: "#7F77DD" },
+  nutrition: { label: "Nutrition", color: "#1D9E75" },
+  training: { label: "Training", color: "#D85A30" },
+  regeneration: { label: "Regeneration", color: "#378ADD" },
+  recovery: { label: "Recovery", color: "#D4537E" },
+  diagnostics: { label: "Diagnostics", color: "#BA7517" },
 };
 
-const ROUTES = ["oral", "sublingual", "topical", "injection", "iv"];
-const FREQUENCIES = ["once daily", "twice daily", "three times daily", "every other day", "weekly", "as needed"];
 const RECURRENCE_TYPES = ["daily", "weekly", "specific_days", "cyclic", "one_time"];
+const RECURRENCE_LABELS = { daily: "Daily", weekly: "Weekly", specific_days: "Specific days", cyclic: "Cyclic", one_time: "One time" };
 const SERVICE_FREQUENCIES = ["weekly", "biweekly", "monthly", "one_time", "as_needed"];
 const SUPPLEMENT_CATEGORIES = [
   { value: "systemic_formula", label: "Systemic Formulas" },
@@ -128,6 +128,8 @@ const S = {
   btnG: { background: "transparent", color: V.txM, border: "none", padding: "6px 12px", fontSize: 13, cursor: "pointer", fontFamily: F, borderRadius: 6 },
   btnD: { background: V.dangerBg, color: V.danger, border: `1px solid ${V.danger}33`, borderRadius: 6, padding: "4px 10px", fontSize: 12, cursor: "pointer", fontFamily: F },
   btnSm: { background: `${V.acc}18`, color: V.acc, border: `1px solid ${V.acc}30`, borderRadius: 6, padding: "5px 12px", fontSize: 12, fontWeight: 500, cursor: "pointer", fontFamily: F },
+  btnAddNew: { background: V.acc, color: "#fff", border: "none", borderRadius: 6, padding: "6px 14px", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: F },
+  btnAddCatalog: { background: `${V.acc}0f`, color: V.acc, border: `1px solid ${V.acc}38`, borderRadius: 6, padding: "6px 14px", fontSize: 12, fontWeight: 500, cursor: "pointer", fontFamily: F },
   cnt: { maxWidth: 1000, margin: "0 auto", padding: "24px 28px" },
   card: { background: V.bgCard, border: `1px solid ${V.bdr}`, borderRadius: 12, marginBottom: 16, overflow: "hidden" },
   cardH: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px", borderBottom: `1px solid ${V.bdr}`, cursor: "pointer", userSelect: "none" },
@@ -154,11 +156,20 @@ const S = {
   tab: (a) => ({ padding: "10px 16px", fontSize: 13, fontWeight: a ? 600 : 400, color: a ? V.acc : V.txM, borderBottom: a ? `2px solid ${V.acc}` : "2px solid transparent", cursor: "pointer", background: "none", border: "none", fontFamily: F, whiteSpace: "nowrap" }),
   divider: { height: 1, background: V.bdr, margin: "12px 0", border: "none" },
   secH: (c) => ({ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", background: `${c}12`, borderRadius: 8, marginBottom: 12 }),
+  ctxBox: { background: `${V.acc}0c`, border: `1px solid ${V.acc}22`, borderRadius: 10, padding: 14, marginTop: 12 },
 };
 
 function PillarTag({ pillar }) {
   const p = PILLARS[pillar];
-  return p ? <span style={S.pill(p.color)}>{p.icon} {p.label}</span> : null;
+  return p ? <span style={S.pill(p.color)}>{p.label}</span> : null;
+}
+
+function CollapseChevron({ expanded }) {
+  return (
+    <span style={{ color: V.txD, fontSize: 14, lineHeight: 1, width: 18, textAlign: "center", display: "inline-block" }} aria-hidden>
+      {expanded ? "\u25BC" : "\u25B6"}
+    </span>
+  );
 }
 
 function CatalogModal({ type, onSelect, onClose, pillarFilter }) {
@@ -180,7 +191,9 @@ function CatalogModal({ type, onSelect, onClose, pillarFilter }) {
       <div style={S.modalC} onClick={(e) => e.stopPropagation()}>
         <div style={S.modalH}>
           <span style={{ fontSize: 15, fontWeight: 600 }}>{type === "supplements" ? "Add from supplement catalogue" : type === "exercises" ? "Add exercise" : "Add service"}</span>
-          <button style={S.btnG} onClick={onClose}>✕</button>
+          <button type="button" style={S.btnG} onClick={onClose} aria-label="Close">
+            Close
+          </button>
         </div>
         <div style={S.modalB}>
           <input style={S.srch} placeholder="Search catalogue..." value={search} onChange={(e) => setSearch(e.target.value)} autoFocus />
@@ -204,7 +217,9 @@ function CatalogModal({ type, onSelect, onClose, pillarFilter }) {
                     {item.duration && <span style={{ color: V.txD, fontSize: 11 }}>{item.duration} min</span>}
                   </div>
                 </div>
-                <button style={S.btnSm}>+ Add</button>
+                <button type="button" style={S.btnSm}>
+                  Add
+                </button>
               </div>
             ))}
           </div>
@@ -216,37 +231,102 @@ function CatalogModal({ type, onSelect, onClose, pillarFilter }) {
 
 function SupplementItem({ item, onChange, onRemove }) {
   const u = (f, v) => onChange({ ...item, [f]: v });
+  const [iconOpen, setIconOpen] = useState(false);
+  const iconId = item.icon_id || DEFAULT_SUPPLEMENT_ICON_ID;
   return (
     <div style={S.iRow}>
-      <div style={{ flex: 1 }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={S.tag(PILLARS.supplements.color)}>{(item.supplement_category || "").replace(/_/g, " ")}</span>
-            <span style={{ fontSize: 14, fontWeight: 600 }}>{item.name}</span>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+          <button
+            type="button"
+            aria-label="Choose icon"
+            onClick={(e) => {
+              e.stopPropagation();
+              setIconOpen(true);
+            }}
+            style={{
+              width: 40,
+              height: 40,
+              flexShrink: 0,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              borderRadius: 8,
+              border: `1px solid ${V.bdr}`,
+              background: V.bgCard,
+              cursor: "pointer",
+              padding: 0,
+            }}
+          >
+            <SupplementIconGlyph id={iconId} size={22} />
+          </button>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <input id={`sup-name-${item.id}`} style={S.inp} value={item.name || ""} onChange={(e) => u("name", e.target.value)} placeholder="Supplement name" aria-label="Supplement name" />
           </div>
-          <button style={S.btnD} onClick={onRemove}>Remove</button>
+          <button type="button" style={{ ...S.btnD, flexShrink: 0 }} onClick={onRemove}>
+            Remove
+          </button>
         </div>
-        <div style={S.fg}>
-          <div style={S.fld}><label style={S.lbl}>Dosage</label><input style={S.inp} value={item.dosage || ""} onChange={(e) => u("dosage", e.target.value)} /></div>
-          <div style={S.fld}><label style={S.lbl}>Route</label><select style={S.sel} value={item.route || "oral"} onChange={(e) => u("route", e.target.value)}>{ROUTES.map((r) => <option key={r}>{r}</option>)}</select></div>
-          <div style={S.fld}><label style={S.lbl}>Frequency</label><select style={S.sel} value={item.frequency || ""} onChange={(e) => u("frequency", e.target.value)}>{FREQUENCIES.map((f) => <option key={f}>{f}</option>)}</select></div>
-        </div>
-        <div style={S.fg}>
-          <div style={S.fld}><label style={S.lbl}>Cycle</label><input style={S.inp} placeholder="e.g. 10 on / 5 off" value={item.cycle || ""} onChange={(e) => u("cycle", e.target.value)} /></div>
-          <div style={S.fld}><label style={S.lbl}>Duration</label><input style={S.inp} placeholder="e.g. 90 days" value={item.duration || ""} onChange={(e) => u("duration", e.target.value)} /></div>
-        </div>
-        <div style={S.fg}>
-          <div style={S.fldF}><label style={S.lbl}>Instructions</label><textarea style={S.ta} value={item.instructions || ""} onChange={(e) => u("instructions", e.target.value)} /></div>
-        </div>
-        <details style={{ marginTop: 4 }}>
-          <summary style={{ fontSize: 12, color: V.acc, cursor: "pointer" }}>Schedule rule</summary>
-          <div style={{ ...S.fg, marginTop: 8 }}>
-            <div style={S.fld}><label style={S.lbl}>Recurrence</label><select style={S.sel} value={item.recurrence_type || "daily"} onChange={(e) => u("recurrence_type", e.target.value)}>{RECURRENCE_TYPES.map((r) => <option key={r}>{r}</option>)}</select></div>
-            <div style={S.fld}><label style={S.lbl}>Anchor time</label><input style={S.inp} type="time" value={item.anchor_time || ""} onChange={(e) => u("anchor_time", e.target.value)} /></div>
-            <div style={S.fld}><label style={S.lbl}>Start</label><input style={S.inp} type="date" value={item.start_date || ""} onChange={(e) => u("start_date", e.target.value)} /></div>
-            <div style={S.fld}><label style={S.lbl}>End</label><input style={S.inp} type="date" value={item.end_date || ""} onChange={(e) => u("end_date", e.target.value)} /></div>
+        {iconOpen && (
+          <SupplementIconPickerModal value={iconId} onChange={(id) => u("icon_id", id)} onClose={() => setIconOpen(false)} />
+        )}
+        <div style={{ ...S.fg, marginBottom: 12 }}>
+          <div style={{ ...S.fld, flex: 1, minWidth: 120 }}>
+            <label style={S.lbl}>Dosage</label>
+            <input style={S.inp} value={item.dosage || ""} onChange={(e) => u("dosage", e.target.value)} placeholder="e.g. 1 scoop" />
           </div>
-        </details>
+          <div style={{ ...S.fld, flex: 1, minWidth: 120 }}>
+            <label style={S.lbl}>Route</label>
+            <input style={S.inp} value={item.route || ""} onChange={(e) => u("route", e.target.value)} placeholder="e.g. oral" />
+          </div>
+        </div>
+        <div style={{ ...S.fg, marginBottom: 12 }}>
+          <div style={{ ...S.fld, flex: 1, minWidth: 100 }}>
+            <label style={S.lbl}>Recurrence</label>
+            <select style={S.sel} value={item.recurrence_type || "daily"} onChange={(e) => u("recurrence_type", e.target.value)}>
+              {RECURRENCE_TYPES.map((r) => (
+                <option key={r} value={r}>{RECURRENCE_LABELS[r] || r}</option>
+              ))}
+            </select>
+          </div>
+          <div style={{ ...S.fld, flex: 1, minWidth: 100 }}>
+            <label style={S.lbl}>Starting at</label>
+            <input style={S.inp} type="date" value={item.start_date || ""} onChange={(e) => u("start_date", e.target.value)} />
+          </div>
+          <div style={{ ...S.fld, flex: 1, minWidth: 100 }}>
+            <label style={S.lbl}>Ending on</label>
+            <input style={S.inp} type="date" value={item.end_date || ""} onChange={(e) => u("end_date", e.target.value)} />
+          </div>
+          <div style={{ ...S.fld, flex: 1, minWidth: 100 }}>
+            <label style={S.lbl}>Time</label>
+            <input style={S.inp} type="time" value={item.anchor_time || ""} onChange={(e) => u("anchor_time", e.target.value)} />
+          </div>
+        </div>
+        <div style={S.fg}>
+          <div style={S.fldF}>
+            <label style={S.lbl}>Instructions</label>
+            <textarea style={S.ta} value={item.instructions || ""} onChange={(e) => u("instructions", e.target.value)} />
+          </div>
+        </div>
+        <div style={S.ctxBox}>
+          <div style={{ ...S.lbl, marginBottom: 16 }}>Context fields</div>
+          <div style={{ marginBottom: 16 }}>
+            <div style={S.fldF}>
+              <label style={S.lbl}>The what</label>
+              <textarea style={S.ta} placeholder="What is this item? Describe it clearly and concisely." value={item.context_what || ""} onChange={(e) => u("context_what", e.target.value)} />
+            </div>
+          </div>
+          <div style={{ marginBottom: 16 }}>
+            <div style={S.fldF}>
+              <label style={S.lbl}>The expectations</label>
+              <textarea style={S.ta} placeholder="What outcomes or results should the patient expect from this?" value={item.context_expectations || ""} onChange={(e) => u("context_expectations", e.target.value)} />
+            </div>
+          </div>
+          <div style={S.fldF}>
+            <label style={S.lbl}>The why</label>
+            <textarea style={S.ta} placeholder="Why is this included in the protocol? What's the clinical rationale?" value={item.context_why || ""} onChange={(e) => u("context_why", e.target.value)} />
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -316,7 +396,9 @@ function NutritionEditor({ data, onChange }) {
       </div>
       <div style={{ ...S.secH(PILLARS.nutrition.color), marginTop: 8, justifyContent: "space-between" }}>
         <span style={{ fontSize: 13, fontWeight: 600 }}>Meal schedule</span>
-        <button style={S.btnSm} onClick={addMeal}>+ Add meal</button>
+        <button type="button" style={S.btnSm} onClick={addMeal}>
+          Add meal
+        </button>
       </div>
       {meals.length === 0 && <div style={{ ...S.empty, padding: "16px" }}>No meals defined — add meals to set timing and notes</div>}
       {meals.map((meal, i) => (
@@ -326,7 +408,9 @@ function NutritionEditor({ data, onChange }) {
             <input style={{ ...S.inp, width: 120, flexShrink: 0 }} value={meal.name} onChange={(e) => updateMeal(i, "name", e.target.value)} placeholder="Meal name" />
             <input style={{ ...S.inp, width: 90, flexShrink: 0 }} type="time" value={meal.time} onChange={(e) => updateMeal(i, "time", e.target.value)} />
             <input style={{ ...S.inp, flex: 1, minWidth: 150 }} value={meal.notes} onChange={(e) => updateMeal(i, "notes", e.target.value)} placeholder="Notes — what to eat, portion guidance..." />
-            <button style={{ ...S.btnG, color: V.danger, padding: "2px 6px", fontSize: 11, flexShrink: 0 }} onClick={() => removeMeal(i)}>✕</button>
+            <button type="button" style={{ ...S.btnG, color: V.danger, padding: "2px 6px", fontSize: 11, flexShrink: 0 }} onClick={() => removeMeal(i)}>
+              Remove
+            </button>
           </div>
         </div>
       ))}
@@ -342,12 +426,14 @@ function TrainingDayEditor({ day, onUpdate, onRemove, onAddExercise }) {
   return (
     <div style={{ ...S.card, marginBottom: 8 }}>
       <div style={{ ...S.cardH, padding: "10px 14px" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, flex: 1 }}>
           <span style={S.badge(PILLARS.training.color)}>Day {day.day_of_week}</span>
-          <input style={{ ...S.inp, fontWeight: 600, border: "none", background: "transparent", padding: "2px 6px", fontSize: 13, width: 220 }} value={day.name} onChange={(e) => onUpdate({ ...day, name: e.target.value })} />
-          <span style={{ fontSize: 11, color: V.txD }}>{exs.length} exercise{exs.length !== 1 ? "s" : ""}</span>
+          <input style={{ ...S.inp, fontWeight: 600, border: "none", background: "transparent", padding: "2px 6px", fontSize: 13, width: 220, maxWidth: "100%" }} value={day.name} onChange={(e) => onUpdate({ ...day, name: e.target.value })} />
         </div>
-        <button style={S.btnD} onClick={onRemove}>Remove day</button>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0 }}>
+          <span style={{ fontSize: 11, color: V.txD, whiteSpace: "nowrap" }}>{exs.length} exercise{exs.length !== 1 ? "s" : ""}</span>
+          <button style={S.btnD} onClick={onRemove}>Remove day</button>
+        </div>
       </div>
       <div style={{ padding: "10px 14px" }}>
         {exs.length > 0 && (
@@ -381,8 +467,12 @@ function TrainingDayEditor({ day, onUpdate, onRemove, onAddExercise }) {
               <input style={{ ...S.inp, width: 70, textAlign: "center", padding: "4px" }} value={ex.target_weight} onChange={(e) => {
                 const u = [...exs]; u[i] = { ...ex, target_weight: e.target.value }; onUpdate({ ...day, exercises: u });
               }} />
-              <button style={{ ...S.btnG, color: V.txD, padding: "2px 4px", fontSize: 11 }} title="Notes" onClick={() => setNotesOpen(notesOpen === ex.id ? null : ex.id)}>📝</button>
-              <button style={{ ...S.btnG, color: V.danger, padding: "2px 6px", fontSize: 11 }} onClick={() => onUpdate({ ...day, exercises: exs.filter((_, j) => j !== i) })}>✕</button>
+              <button type="button" style={{ ...S.btnG, color: V.txD, padding: "2px 6px", fontSize: 11 }} onClick={() => setNotesOpen(notesOpen === ex.id ? null : ex.id)}>
+                Notes
+              </button>
+              <button type="button" style={{ ...S.btnG, color: V.danger, padding: "2px 6px", fontSize: 11 }} onClick={() => onUpdate({ ...day, exercises: exs.filter((_, j) => j !== i) })}>
+                Remove
+              </button>
             </div>
             {notesOpen === ex.id && (
               <div style={{ padding: "4px 0 8px 26px", borderBottom: i < exs.length - 1 ? `1px solid ${V.bdr}33` : "none" }}>
@@ -393,7 +483,9 @@ function TrainingDayEditor({ day, onUpdate, onRemove, onAddExercise }) {
             )}
           </div>
         ))}
-        <button style={{ ...S.btnSm, marginTop: 8 }} onClick={onAddExercise}>+ Add exercise</button>
+        <button type="button" style={{ ...S.btnSm, marginTop: 8 }} onClick={onAddExercise}>
+          Add exercise
+        </button>
       </div>
     </div>
   );
@@ -415,7 +507,7 @@ export default function ProtocolBuilder() {
   const addItem = (secId, ci, type) => {
     setSections(sections.map((s) => {
       if (s.id !== secId) return s;
-      const item = type === "supplement" ? { id: gid(), type: "supplement", catalog_id: ci.id, name: ci.name, supplement_category: ci.category, dosage: ci.defaults?.dosage || "", route: ci.defaults?.route || "oral", frequency: ci.defaults?.frequency || "", instructions: ci.defaults?.instructions || "", cycle: "", duration: "", recurrence_type: "daily", anchor_time: "", start_date: "", end_date: "" }
+      const item = type === "supplement" ? { id: gid(), type: "supplement", catalog_id: ci.id, name: ci.name, supplement_category: ci.category, icon_id: DEFAULT_SUPPLEMENT_ICON_ID, dosage: ci.defaults?.dosage || "", route: ci.defaults?.route || "oral", frequency: ci.defaults?.frequency || "", instructions: ci.defaults?.instructions || "", cycle: "", duration: "", recurrence_type: "daily", anchor_time: "", start_date: "", end_date: "", context_what: "", context_expectations: "", context_why: "" }
         : { id: gid(), type: "service", catalog_id: ci.id, name: ci.name, service_pillar: ci.pillar, duration_minutes: ci.duration, frequency: "weekly", preferred_window: "", notes: "", start_date: "", end_date: "" };
       return { ...s, items: [...s.items, item] };
     }));
@@ -424,6 +516,22 @@ export default function ProtocolBuilder() {
   const removeItem = (sid, iid) => setSections(sections.map((s) => s.id === sid ? { ...s, items: s.items.filter((i) => i.id !== iid) } : s));
   const updateItem = (sid, iid, u) => setSections(sections.map((s) => s.id === sid ? { ...s, items: s.items.map((i) => (i.id === iid ? u : i)) } : s));
   const addDay = (sid) => setSections(sections.map((s) => { if (s.id !== sid) return s; const d = s.training?.days || []; return { ...s, training: { ...s.training, days: [...d, { id: gid(), day_of_week: d.length + 1, name: `Day ${d.length + 1}`, exercises: [] }] } }; }));
+
+  const addBlankSupplement = (secId) => {
+    setSections(sections.map((s) => {
+      if (s.id !== secId) return s;
+      const item = { id: gid(), type: "supplement", catalog_id: "", name: "", supplement_category: "other_supplement", icon_id: DEFAULT_SUPPLEMENT_ICON_ID, dosage: "", route: "oral", frequency: "", instructions: "", cycle: "", duration: "", recurrence_type: "daily", anchor_time: "", start_date: "", end_date: "", context_what: "", context_expectations: "", context_why: "" };
+      return { ...s, items: [...s.items, item] };
+    }));
+  };
+
+  const addBlankService = (secId) => {
+    setSections(sections.map((s) => {
+      if (s.id !== secId) return s;
+      const item = { id: gid(), type: "service", catalog_id: "", name: "", service_pillar: s.pillar, duration_minutes: 30, frequency: "weekly", preferred_window: "", notes: "", start_date: "", end_date: "" };
+      return { ...s, items: [...s.items, item] };
+    }));
+  };
 
   const loadTemplate = (t) => {
     setMeta({ ...meta, name: t.name, clinical_objective: t.description });
@@ -970,7 +1078,7 @@ export default function ProtocolBuilder() {
         <div style={S.card}>
           <div style={S.cardH} onClick={() => toggle("meta")}>
             <span style={{ fontSize: 14, fontWeight: 600 }}>Protocol details</span>
-            <span style={{ fontSize: 12, color: V.txD }}>{collapsed.meta ? "▸" : "▾"}</span>
+            <CollapseChevron expanded={!collapsed.meta} />
           </div>
           {!collapsed.meta && (
             <div style={S.cardB}>
@@ -998,7 +1106,9 @@ export default function ProtocolBuilder() {
                 <button style={S.btnP} onClick={() => setTemplateModal(true)}>Load from template</button>
                 <span style={{ color: V.txD, alignSelf: "center", fontSize: 12 }}>or add a section:</span>
                 {Object.entries(PILLARS).map(([k, p]) => (
-                  <button key={k} style={{ ...S.btnG, border: `1px solid ${p.color}30`, color: p.color, borderRadius: 8, fontSize: 12 }} onClick={() => addSection(k)}>{p.icon} {p.label}</button>
+                  <button key={k} type="button" style={{ ...S.btnG, border: `1px solid ${p.color}30`, color: p.color, borderRadius: 8, fontSize: 12 }} onClick={() => addSection(k)}>
+                    {p.label}
+                  </button>
                 ))}
               </div>
             </div>
@@ -1010,12 +1120,20 @@ export default function ProtocolBuilder() {
           <>
             <div style={S.tabBar}>
               <button style={S.tab(activeTab === "all")} onClick={() => setActiveTab("all")}>All ({sections.length})</button>
-              {Object.entries(PILLARS).map(([k, p]) => pCounts[k] ? <button key={k} style={S.tab(activeTab === k)} onClick={() => setActiveTab(k)}>{p.icon} {p.label} ({pCounts[k]})</button> : null)}
+              {Object.entries(PILLARS).map(([k, p]) =>
+                pCounts[k] ? (
+                  <button key={k} type="button" style={S.tab(activeTab === k)} onClick={() => setActiveTab(k)}>
+                    {p.label} ({pCounts[k]})
+                  </button>
+                ) : null,
+              )}
             </div>
             <div style={{ display: "flex", gap: 6, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
               <span style={{ fontSize: 12, color: V.txD, marginRight: 4 }}>Add section:</span>
               {Object.entries(PILLARS).map(([k, p]) => (
-                <button key={k} style={{ ...S.btnG, border: `1px solid ${p.color}25`, color: p.color, borderRadius: 6, fontSize: 11, padding: "4px 10px" }} onClick={() => addSection(k)}>{p.icon} {p.label}</button>
+                <button key={k} type="button" style={{ ...S.btnG, border: `1px solid ${p.color}25`, color: p.color, borderRadius: 6, fontSize: 11, padding: "4px 10px" }} onClick={() => addSection(k)}>
+                  {p.label}
+                </button>
               ))}
               <div style={{ flex: 1 }} />
               <button style={S.btnS} onClick={() => setTemplateModal(true)}>Load template</button>
@@ -1025,14 +1143,13 @@ export default function ProtocolBuilder() {
             {filtered.map((sec) => (
               <div key={sec.id} style={{ ...S.card, borderLeft: `3px solid ${PILLARS[sec.pillar]?.color || V.bdr}` }}>
                 <div style={S.cardH} onClick={() => toggle(sec.id)}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <PillarTag pillar={sec.pillar} />
-                    <input style={{ ...S.inp, border: "none", background: "transparent", fontWeight: 600, fontSize: 14, padding: "0 4px", width: 220 }} value={sec.name} onClick={(e) => e.stopPropagation()} onChange={(e) => updateSection(sec.id, { name: e.target.value })} />
-                    <span style={{ fontSize: 11, color: V.txD }}>{sec.items.length} item{sec.items.length !== 1 ? "s" : ""}{sec.training?.days?.length ? ` · ${sec.training.days.length} days` : ""}</span>
+                  <div style={{ display: "flex", alignItems: "center", minWidth: 0, flex: 1 }} onClick={(e) => e.stopPropagation()}>
+                    <span style={{ fontWeight: 600, fontSize: 14, color: V.tx, padding: "0 4px" }}>{sec.name || "Untitled section"}</span>
                   </div>
-                  <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                    <button style={S.btnD} onClick={(e) => { e.stopPropagation(); removeSection(sec.id); }}>Remove</button>
-                    <span style={{ color: V.txD, fontSize: 12 }}>{collapsed[sec.id] ? "▸" : "▾"}</span>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0 }}>
+                    <span style={{ fontSize: 11, color: V.txD, whiteSpace: "nowrap" }}>{sec.items.length} item{sec.items.length !== 1 ? "s" : ""}{sec.training?.days?.length ? ` · ${sec.training.days.length} days` : ""}</span>
+                    <button type="button" style={S.btnD} onClick={(e) => { e.stopPropagation(); removeSection(sec.id); }}>Remove</button>
+                    <CollapseChevron expanded={!collapsed[sec.id]} />
                   </div>
                 </div>
                 {!collapsed[sec.id] && (
@@ -1040,7 +1157,21 @@ export default function ProtocolBuilder() {
                     {sec.pillar === "supplements" && (
                       <>
                         {sec.items.map((it) => <SupplementItem key={it.id} item={it} onChange={(u) => updateItem(sec.id, it.id, u)} onRemove={() => removeItem(sec.id, it.id)} />)}
-                        <button style={S.btnSm} onClick={() => { setActiveSec(sec.id); setCatalogModal("supplements"); }}>+ Add from catalogue</button>
+                        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+                          <button type="button" style={S.btnAddNew} onClick={() => addBlankSupplement(sec.id)}>
+                            + Add New
+                          </button>
+                          <button
+                            type="button"
+                            style={S.btnAddCatalog}
+                            onClick={() => {
+                              setActiveSec(sec.id);
+                              setCatalogModal("supplements");
+                            }}
+                          >
+                            + Add from catalogue
+                          </button>
+                        </div>
                       </>
                     )}
                     {sec.pillar === "nutrition" && <NutritionEditor data={sec.nutrition || {}} onChange={(n) => updateSection(sec.id, { nutrition: n })} />}
@@ -1059,13 +1190,29 @@ export default function ProtocolBuilder() {
                             onAddExercise={() => { setActiveSec(`td-${sec.id}-${day.id}`); setCatalogModal("exercises"); }}
                           />
                         ))}
-                        <button style={S.btnSm} onClick={() => addDay(sec.id)}>+ Add workout day</button>
+                        <button type="button" style={S.btnSm} onClick={() => addDay(sec.id)}>
+                          Add workout day
+                        </button>
                       </>
                     )}
                     {["diagnostics", "recovery", "regeneration"].includes(sec.pillar) && (
                       <>
                         {sec.items.map((it) => <ServiceItem key={it.id} item={it} onChange={(u) => updateItem(sec.id, it.id, u)} onRemove={() => removeItem(sec.id, it.id)} />)}
-                        <button style={S.btnSm} onClick={() => { setActiveSec(sec.id); setCatalogModal("services"); }}>+ Add from catalogue</button>
+                        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+                          <button type="button" style={S.btnAddNew} onClick={() => addBlankService(sec.id)}>
+                            + Add New
+                          </button>
+                          <button
+                            type="button"
+                            style={S.btnAddCatalog}
+                            onClick={() => {
+                              setActiveSec(sec.id);
+                              setCatalogModal("services");
+                            }}
+                          >
+                            + Add from catalogue
+                          </button>
+                        </div>
                       </>
                     )}
                   </div>
@@ -1093,7 +1240,12 @@ export default function ProtocolBuilder() {
       {templateModal && (
         <div style={S.modal} onClick={() => setTemplateModal(false)}>
           <div style={S.modalC} onClick={(e) => e.stopPropagation()}>
-            <div style={S.modalH}><span style={{ fontSize: 15, fontWeight: 600 }}>Load from protocol template</span><button style={S.btnG} onClick={() => setTemplateModal(false)}>✕</button></div>
+            <div style={S.modalH}>
+              <span style={{ fontSize: 15, fontWeight: 600 }}>Load from protocol template</span>
+              <button type="button" style={S.btnG} onClick={() => setTemplateModal(false)} aria-label="Close">
+                Close
+              </button>
+            </div>
             <div style={S.modalB}>
               <input style={S.srch} placeholder="Search templates..." autoFocus />
               {MOCK_TEMPLATES.map((t) => (
