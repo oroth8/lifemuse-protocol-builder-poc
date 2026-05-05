@@ -1,7 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useCallback, useLayoutEffect, useRef, useState } from "react";
+import { addUserProtocol } from "../lib/userProtocols";
+import { createPortal } from "react-dom";
 import { DEFAULT_SUPPLEMENT_ICON_ID, SupplementIconGlyph, SupplementIconPickerModal } from "./protocolSupplementIcons";
 
 const PILLARS = {
@@ -13,8 +16,20 @@ const PILLARS = {
   diagnostics: { label: "Diagnostics", color: "#D40511" },
 };
 
-const RECURRENCE_TYPES = ["daily", "weekly", "specific_days", "cyclic", "one_time"];
-const RECURRENCE_LABELS = { daily: "Daily", weekly: "Weekly", specific_days: "Specific days", cyclic: "Cyclic", one_time: "One time" };
+const RECURRENCE_TYPES = ["single_occurrence", "daily", "custom"];
+const RECURRENCE_LABELS = {
+  single_occurrence: "Single Occurrence",
+  daily: "Daily",
+  custom: "Custom",
+};
+
+/** Normalize stored recurrence to one of the three dropdown values (legacy keys → custom / single_occurrence / daily). */
+function recurrenceSelectValue(stored) {
+  const r = stored || "daily";
+  if (r === "daily") return "daily";
+  if (r === "single_occurrence" || r === "one_time") return "single_occurrence";
+  return "custom";
+}
 const RECOVERY_ITEM_TYPES = [
   { value: "session", label: "Session" },
   { value: "task", label: "Task" },
@@ -57,10 +72,10 @@ function guessDiagnosticsSessionType(serviceName) {
 }
 
 function legacyServiceFrequencyToRecurrence(freq) {
-  if (!freq) return "weekly";
-  if (freq === "one_time") return "one_time";
+  if (!freq) return "custom";
+  if (freq === "one_time") return "single_occurrence";
   if (freq === "as_needed") return "daily";
-  return "weekly";
+  return "custom";
 }
 
 function guessRecoverySessionType(serviceName) {
@@ -275,6 +290,41 @@ const TRAINING_CATALOG_PROGRAMS = [
   { id: "tp-004", name: "Weight Loss Training", muscle_group: "shoulders", equipment: "barbell", description: "Metabolic strength circuits", item_ids: ["tw-001", "tw-005"] },
 ];
 
+/** Nutrition pillar — item types (UI only; session vs task) */
+const NUTRITION_ITEM_TYPE_OPTIONS = [
+  { value: "session", label: "Session" },
+  { value: "task", label: "Task" },
+];
+const NUTRITION_SESSION_TYPES = ["Consultation", "Meal planning", "Follow-up", "Education session", "Grocery review"];
+
+const NUTRITION_CATALOG_CATEGORIES = [
+  { value: "all", label: "All" },
+  { value: "meat", label: "Meat" },
+  { value: "drinks", label: "Drinks" },
+  { value: "vegetables", label: "Vegetables" },
+  { value: "others", label: "Others" },
+];
+
+const MOCK_NUTRITION_CATALOG_ITEMS = [
+  { id: "n-m1", name: "Fish", category: "meat" },
+  { id: "n-m2", name: "Raw Meat", category: "meat" },
+  { id: "n-m3", name: "Poultry", category: "meat" },
+  { id: "n-d1", name: "Drink Water", category: "drinks" },
+  { id: "n-d2", name: "Drink Orange Juice", category: "drinks" },
+  { id: "n-v1", name: "Eat Salad", category: "vegetables" },
+  { id: "n-v2", name: "Steamed Broccoli", category: "vegetables" },
+  { id: "n-o1", name: "Nuts and seeds", category: "others" },
+  { id: "n-o2", name: "Olive oil", category: "others" },
+];
+
+const MOCK_NUTRITION_PROGRAMS = [
+  { id: "np-1", name: "Vegan", description: "Plant-based eating pattern", item_ids: ["n-v1", "n-v2", "n-o1"] },
+  { id: "np-2", name: "Vegetarian", description: "Lacto-ovo vegetarian", item_ids: ["n-m3", "n-d1", "n-v1"] },
+  { id: "np-3", name: "Gluten Free", description: "No gluten-containing foods", item_ids: ["n-m1", "n-m2", "n-v1"] },
+  { id: "np-4", name: "Keto", description: "Very low carbohydrate", item_ids: ["n-m1", "n-m2", "n-o2"] },
+  { id: "np-5", name: "Intermittent Fasting", description: "Time-restricted eating", item_ids: ["n-d1", "n-m3", "n-v2"] },
+];
+
 const MOCK_TEMPLATES = [
   { id: "pt-001", name: "Parasite Cleanse Protocol", pillar: "supplements", description: "90-day systemic parasite cleanse with drainage support" },
   { id: "pt-002", name: "Gut Healing Protocol", pillar: "supplements", description: "12-week gut repair with L-glutamine, probiotics, and dietary modifications" },
@@ -371,16 +421,64 @@ function migrateTrainingItems(sec) {
     icon_id: DEFAULT_SUPPLEMENT_ICON_ID,
     name: d.name || `Day ${d.day_of_week || idx + 1}`,
     training_item_type: "task",
-    recurrence_type: "weekly",
+    recurrence_type: "custom",
     start_date: "",
     end_date: "",
     anchor_time: "",
+    concierge_reminder_days: "",
     instructions: "",
     exercises: d.exercises || [],
     context_what: "",
     context_expectations: "",
     context_why: "",
   }));
+}
+
+function hasLegacyNutritionData(sec) {
+  if (sec.pillar !== "nutrition" || !sec.nutrition) return false;
+  const n = sec.nutrition;
+  return !!(
+    n.plan_name ||
+    (n.meals && n.meals.length) ||
+    (n.macros && Object.values(n.macros).some((v) => v != null && v !== "")) ||
+    n.foods_include ||
+    n.foods_exclude ||
+    n.notes ||
+    n.fasting_start
+  );
+}
+
+function countNutritionItems(sec) {
+  if (sec.pillar !== "nutrition") return 0;
+  const nutritionRows = (sec.items || []).filter((it) => it.type === "nutrition").length;
+  if (nutritionRows > 0) return nutritionRows;
+  if (hasLegacyNutritionData(sec)) return 1;
+  return 0;
+}
+
+function blankNutritionItem(over = {}) {
+  return {
+    id: gid(),
+    type: "nutrition",
+    name: "",
+    icon_id: DEFAULT_SUPPLEMENT_ICON_ID,
+    nutrition_item_type: "task",
+    nutrition_session_type: "Consultation",
+    recurrence_type: "custom",
+    start_date: "",
+    end_date: "",
+    anchor_time: "",
+    concierge_reminder_days: "",
+    instructions: "",
+    context_what: "",
+    context_expectations: "",
+    context_why: "",
+    ...over,
+  };
+}
+
+function nutritionItemFromCatalogRow(row) {
+  return blankNutritionItem({ name: row.name });
 }
 
 function ModalCloseButton({ onClose }) {
@@ -405,6 +503,319 @@ function ModalCloseButton({ onClose }) {
         <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
     </button>
+  );
+}
+
+const CUSTOM_RECURRENCE_UNITS = [
+  { value: "day", label: "Day" },
+  { value: "week", label: "Week" },
+  { value: "month", label: "Month" },
+];
+
+/** M T W T F S S — values are JavaScript weekday numbers (Sun = 0 … Sat = 6). */
+const CUSTOM_WEEKDAY_PICKER = [
+  { letter: "M", day: 1 },
+  { letter: "T", day: 2 },
+  { letter: "W", day: 3 },
+  { letter: "T", day: 4 },
+  { letter: "F", day: 5 },
+  { letter: "S", day: 6 },
+  { letter: "S", day: 0 },
+];
+
+function defaultRecurrenceCustom() {
+  return { repeat_every: 1, repeat_unit: "week", repeat_on: [2, 4] };
+}
+
+function normalizeRecurrenceCustom(initial) {
+  if (!initial || typeof initial !== "object") return defaultRecurrenceCustom();
+  const every = Math.max(1, Number(initial.repeat_every) || 1);
+  const unit = CUSTOM_RECURRENCE_UNITS.some((u) => u.value === initial.repeat_unit) ? initial.repeat_unit : "week";
+  const rawDays = Array.isArray(initial.repeat_on) ? initial.repeat_on : defaultRecurrenceCustom().repeat_on;
+  const on = [...new Set(rawDays.map(Number).filter((d) => d >= 0 && d <= 6))].sort((a, b) => a - b);
+  return { repeat_every: every, repeat_unit: unit, repeat_on: on };
+}
+
+function CustomRecurrenceModal({ initial, onDone, onCancel }) {
+  const base = normalizeRecurrenceCustom(initial);
+  const [every, setEvery] = useState(base.repeat_every);
+  const [unit, setUnit] = useState(base.repeat_unit);
+  const [onDays, setOnDays] = useState(() => [...base.repeat_on]);
+
+  const toggleDay = (d) => {
+    setOnDays((prev) => (prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d].sort((a, b) => a - b)));
+  };
+
+  const dayBtn = (active) => ({
+    width: 36,
+    height: 36,
+    borderRadius: "50%",
+    border: `1px solid ${active ? V.acc : V.bdr}`,
+    background: active ? V.acc : V.bgCard,
+    color: active ? "#fff" : V.tx,
+    fontSize: 12,
+    fontWeight: 600,
+    cursor: "pointer",
+    fontFamily: F,
+    padding: 0,
+    flexShrink: 0,
+  });
+
+  return (
+    <div style={S.modal} onClick={onCancel} role="presentation">
+      <div style={{ ...S.modalC, maxWidth: 420 }} onClick={(e) => e.stopPropagation()} role="dialog" aria-labelledby="custom-recurrence-title">
+        <div style={{ ...S.modalH, borderBottom: "none", paddingBottom: 0 }}>
+          <span id="custom-recurrence-title" style={{ ...S.lbl, fontSize: 13, letterSpacing: "0.08em" }}>
+            Custom…
+          </span>
+          <ModalCloseButton onClose={onCancel} />
+        </div>
+        <div style={{ ...S.modalB, paddingTop: 12 }}>
+          <div style={{ marginBottom: 18 }}>
+            <label style={{ ...S.lbl, display: "block", marginBottom: 8 }}>Repeat every</label>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+              <input
+                style={{ ...S.inp, width: 72 }}
+                type="number"
+                min={1}
+                step={1}
+                value={every}
+                onChange={(e) => setEvery(Math.max(1, Number(e.target.value) || 1))}
+              />
+              <select style={{ ...S.sel, flex: 1, minWidth: 120 }} value={unit} onChange={(e) => setUnit(e.target.value)}>
+                {CUSTOM_RECURRENCE_UNITS.map((u) => (
+                  <option key={u.value} value={u.value}>{u.label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          {unit !== "day" && (
+            <div style={{ marginBottom: 22 }}>
+              <span style={{ ...S.lbl, display: "block", marginBottom: 10 }}>Repeat on</span>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                {CUSTOM_WEEKDAY_PICKER.map(({ letter, day }) => (
+                  <button key={`${letter}-${day}`} type="button" style={dayBtn(onDays.includes(day))} onClick={() => toggleDay(day)} aria-pressed={onDays.includes(day)}>
+                    {letter}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          <div style={{ display: "flex", gap: 12, justifyContent: "flex-end", marginTop: 8 }}>
+            <button type="button" style={S.btnS} onClick={onCancel}>
+              Cancel
+            </button>
+            <button
+              type="button"
+              style={S.btnP}
+              onClick={() =>
+                onDone({
+                  repeat_every: every,
+                  repeat_unit: unit,
+                  repeat_on: unit === "day" ? [] : [...onDays],
+                })}
+            >
+              Done
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Recurrence dropdown; choosing Custom opens configuration modal. */
+function RecurrenceSelect({ item, onItemChange, recurrenceFallback = "daily", selectStyle }) {
+  const [customOpen, setCustomOpen] = useState(false);
+  const snapshotRef = useRef(null);
+  const mergedRaw = item.recurrence_type ?? recurrenceFallback;
+  const displayVal = recurrenceSelectValue(mergedRaw);
+
+  const patch = (partial) => onItemChange({ ...item, ...partial });
+
+  const handleSelectChange = (e) => {
+    const v = e.target.value;
+    if (v === "custom") {
+      snapshotRef.current = { ...item };
+      patch({ recurrence_type: "custom" });
+      setCustomOpen(true);
+    } else {
+      patch({ recurrence_type: v, recurrence_custom: undefined });
+    }
+  };
+
+  const handleCustomDone = (custom) => {
+    patch({ recurrence_type: "custom", recurrence_custom: custom });
+    setCustomOpen(false);
+    snapshotRef.current = null;
+  };
+
+  const handleCustomCancel = () => {
+    setCustomOpen(false);
+    if (snapshotRef.current) {
+      onItemChange(snapshotRef.current);
+      snapshotRef.current = null;
+    }
+  };
+
+  const openEditCustom = () => {
+    snapshotRef.current = { ...item };
+    setCustomOpen(true);
+  };
+
+  const selStyle = selectStyle || S.sel;
+
+  return (
+    <>
+      <select style={selStyle} value={displayVal} onChange={handleSelectChange} aria-label="Recurrence">
+        {RECURRENCE_TYPES.map((r) => (
+          <option key={r} value={r}>{RECURRENCE_LABELS[r] || r}</option>
+        ))}
+      </select>
+      {displayVal === "custom" && (
+        <button type="button" style={{ ...S.btnG, fontSize: 11, marginTop: 4, padding: "2px 0", alignSelf: "flex-start" }} onClick={openEditCustom}>
+          Edit custom pattern
+        </button>
+      )}
+      {customOpen && (
+        <CustomRecurrenceModal initial={item.recurrence_custom} onDone={handleCustomDone} onCancel={handleCustomCancel} />
+      )}
+    </>
+  );
+}
+
+const CONCIERGE_REMINDER_TOOLTIP =
+  "Number of days before the appointment that concierge should be reminded to book the session.";
+
+/** Info icon fill — softer than body text black */
+const CONCIERGE_INFO_ICON_BG = "#8A93A6";
+
+function ConciergeReminderField({ itemId, value, onChange }) {
+  const inputId = `concierge-reminder-${itemId}`;
+  const tipId = `${inputId}-tooltip`;
+  const [tipOpen, setTipOpen] = useState(false);
+  const triggerWrapRef = useRef(null);
+  const [tipBox, setTipBox] = useState(null);
+
+  const updateTipPosition = useCallback(() => {
+    const el = triggerWrapRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const pad = 10;
+    const maxWidth = Math.min(288, Math.max(200, window.innerWidth - 2 * pad));
+    let left = r.left + r.width / 2 - maxWidth / 2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - maxWidth - pad));
+    const gap = 8;
+    const top = r.top - gap;
+    setTipBox({
+      position: "fixed",
+      left,
+      top,
+      width: maxWidth,
+      transform: "translateY(-100%)",
+      boxSizing: "border-box",
+      padding: "10px 12px",
+      background: V.bgCard,
+      color: V.tx,
+      fontSize: 12,
+      fontWeight: 400,
+      fontFamily: F,
+      fontStyle: "normal",
+      lineHeight: 1.45,
+      borderRadius: 8,
+      border: `1px solid ${V.bdr}`,
+      boxShadow: "0 4px 20px rgba(15, 23, 42, 0.12)",
+      zIndex: 10000,
+      pointerEvents: "none",
+      textAlign: "left",
+      textTransform: "none",
+      letterSpacing: "normal",
+      overflowWrap: "break-word",
+    });
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!tipOpen) {
+      setTipBox(null);
+      return;
+    }
+    updateTipPosition();
+    const onReposition = () => updateTipPosition();
+    window.addEventListener("scroll", onReposition, true);
+    window.addEventListener("resize", onReposition);
+    return () => {
+      window.removeEventListener("scroll", onReposition, true);
+      window.removeEventListener("resize", onReposition);
+    };
+  }, [tipOpen, updateTipPosition]);
+
+  const tooltipNode =
+    tipOpen &&
+    tipBox &&
+    typeof document !== "undefined" &&
+    createPortal(
+      <span id={tipId} role="tooltip" style={tipBox}>
+        {CONCIERGE_REMINDER_TOOLTIP}
+      </span>,
+      document.body,
+    );
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 6, minWidth: 0, overflow: "visible" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", overflow: "visible" }}>
+        <label style={S.lbl} htmlFor={inputId}>
+          Concierge reminder
+        </label>
+        <span
+          ref={triggerWrapRef}
+          style={{ position: "relative", display: "inline-flex", alignItems: "center", overflow: "visible" }}
+          onPointerEnter={() => setTipOpen(true)}
+          onPointerLeave={() => setTipOpen(false)}
+        >
+          <button
+            type="button"
+            id={`${inputId}-info`}
+            aria-label="About concierge reminder"
+            aria-describedby={tipOpen && tipBox ? tipId : undefined}
+            onFocus={() => setTipOpen(true)}
+            onBlur={() => setTipOpen(false)}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              width: 16,
+              height: 16,
+              borderRadius: "50%",
+              border: "none",
+              background: CONCIERGE_INFO_ICON_BG,
+              color: "#fff",
+              fontSize: 10,
+              fontWeight: 700,
+              fontStyle: "italic",
+              cursor: "help",
+              flexShrink: 0,
+              lineHeight: 1,
+              fontFamily: "Georgia, serif",
+              padding: 0,
+            }}
+          >
+            i
+          </button>
+        </span>
+      </div>
+      {tooltipNode}
+      <input
+        id={inputId}
+        style={S.inp}
+        type="number"
+        min={0}
+        step={1}
+        inputMode="numeric"
+        placeholder="Days"
+        value={value ?? ""}
+        onChange={(e) => onChange(e.target.value)}
+      />
+    </div>
   );
 }
 
@@ -801,6 +1212,164 @@ function TrainingCatalogModal({ onClose, onSelectItem, onSelectProgram }) {
   );
 }
 
+/** Nutrition pillar — Items / Programs catalogue (mock items + programs) */
+function NutritionCatalogModal({ onClose, onSelectItem, onSelectProgram }) {
+  const [search, setSearch] = useState("");
+  const [catF, setCatF] = useState("all");
+  const [listMode, setListMode] = useState("items");
+  /** Tabs + category filters: app accent (blue). “Nutrition” row tags: pillar green. */
+  const sq = search.trim().toLowerCase();
+  const filteredItems = MOCK_NUTRITION_CATALOG_ITEMS.filter((i) => {
+    const ms = !sq || i.name.toLowerCase().includes(sq);
+    const mc = catF === "all" || i.category === catF;
+    return ms && mc;
+  });
+  const filteredPrograms = MOCK_NUTRITION_PROGRAMS.filter((p) => {
+    const ms = !sq || p.name.toLowerCase().includes(sq) || (p.description || "").toLowerCase().includes(sq);
+    return ms;
+  });
+  const segShell = {
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr",
+    gap: 0,
+    width: "100%",
+    padding: 0,
+    borderRadius: 6,
+    border: "none",
+    boxShadow: "none",
+    background: "transparent",
+    marginBottom: 14,
+    boxSizing: "border-box",
+    overflow: "hidden",
+  };
+  const segBtn = (active) => ({
+    width: "100%",
+    minWidth: 0,
+    margin: 0,
+    border: "none",
+    borderRadius: 0,
+    padding: "8px 16px",
+    fontSize: 13,
+    fontWeight: 600,
+    cursor: "pointer",
+    fontFamily: F,
+    background: active ? V.acc : `${V.acc}14`,
+    color: active ? "#fff" : V.acc,
+    transition: "background 0.15s ease, color 0.15s ease",
+    outline: "none",
+    boxShadow: "none",
+    WebkitAppearance: "none",
+    appearance: "none",
+  });
+  const nutritionRowAdd = { ...S.btnAddCatalog, fontSize: 12, fontWeight: 500, flexShrink: 0 };
+
+  return (
+    <div style={S.modal} onClick={onClose}>
+      <div style={S.modalC} onClick={(e) => e.stopPropagation()}>
+        <div style={S.modalH}>
+          <span style={{ fontSize: 15, fontWeight: 600 }}>Add Item</span>
+          <ModalCloseButton onClose={onClose} />
+        </div>
+        <div style={S.modalB}>
+          <input style={S.srch} placeholder="Search items or programs" value={search} onChange={(e) => setSearch(e.target.value)} autoFocus />
+          <div style={segShell} role="tablist" aria-label="Nutrition catalogue">
+            <button type="button" role="tab" aria-selected={listMode === "items"} style={segBtn(listMode === "items")} onClick={() => setListMode("items")}>
+              Items
+            </button>
+            <button type="button" role="tab" aria-selected={listMode === "programs"} style={segBtn(listMode === "programs")} onClick={() => setListMode("programs")}>
+              Programs
+            </button>
+          </div>
+          {listMode === "items" && (
+            <div style={{ display: "flex", gap: 6, marginBottom: 14, flexWrap: "wrap" }}>
+              {NUTRITION_CATALOG_CATEGORIES.map((c) => (
+                <button
+                  key={c.value}
+                  type="button"
+                  style={{
+                    ...S.btnG,
+                    background: catF === c.value ? `${V.acc}18` : "transparent",
+                    color: catF === c.value ? V.acc : V.txM,
+                    borderRadius: 20,
+                    fontSize: 11,
+                    padding: "4px 12px",
+                  }}
+                  onClick={() => setCatF(c.value)}
+                >
+                  {c.label}
+                </button>
+              ))}
+            </div>
+          )}
+          <div style={{ maxHeight: 350, overflow: "auto" }}>
+            {listMode === "items" && (
+              <>
+                {filteredItems.length === 0 && <div style={S.empty}>No items match your search</div>}
+                {filteredItems.map((item) => (
+                  <div
+                    key={item.id}
+                    style={S.catR}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = V.bgHover)}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                  >
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 500 }}>{item.name}</div>
+                      <div style={{ fontSize: 11, color: V.txD, marginTop: 4 }}>
+                        <span style={S.tag(PILLARS.nutrition.color)}>Nutrition</span>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      style={nutritionRowAdd}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onSelectItem(item);
+                      }}
+                    >
+                      + Add
+                    </button>
+                  </div>
+                ))}
+              </>
+            )}
+            {listMode === "programs" && (
+              <>
+                {filteredPrograms.length === 0 && <div style={S.empty}>No programs match your search</div>}
+                {filteredPrograms.map((prog) => (
+                  <div
+                    key={prog.id}
+                    style={S.catR}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = V.bgHover)}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                  >
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 500 }}>{prog.name}</div>
+                      {prog.description && <div style={{ fontSize: 12, color: V.txM, marginTop: 4 }}>{prog.description}</div>}
+                      <div style={{ fontSize: 11, color: V.txD, marginTop: 6 }}>
+                        <span style={S.tag(PILLARS.nutrition.color)}>Nutrition</span>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      style={nutritionRowAdd}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onSelectProgram(prog);
+                      }}
+                    >
+                      + Add
+                    </button>
+                  </div>
+                ))}
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /** Training day — pick a single exercise from the master list (does not use CatalogModal) */
 function TrainingExerciseModal({ onClose, onSelectExercise }) {
   const [search, setSearch] = useState("");
@@ -937,11 +1506,7 @@ function SupplementItem({ item, onChange, onRemove }) {
         <div style={{ ...S.fg, marginBottom: 12 }}>
           <div style={{ ...S.fld, flex: 1, minWidth: 100 }}>
             <label style={S.lbl}>Recurrence</label>
-            <select style={S.sel} value={item.recurrence_type || "daily"} onChange={(e) => u("recurrence_type", e.target.value)}>
-              {RECURRENCE_TYPES.map((r) => (
-                <option key={r} value={r}>{RECURRENCE_LABELS[r] || r}</option>
-              ))}
-            </select>
+            <RecurrenceSelect item={item} onItemChange={onChange} recurrenceFallback="daily" />
           </div>
           <div style={{ ...S.fld, flex: 1, minWidth: 100 }}>
             <label style={S.lbl}>Starting at</label>
@@ -991,11 +1556,10 @@ function RecoveryServiceItem({ item, onChange, onRemove, accentColor = PILLARS.r
   const [iconOpen, setIconOpen] = useState(false);
   const iconId = item.icon_id || DEFAULT_SUPPLEMENT_ICON_ID;
   const kind = item.recovery_item_type || "session";
-  const recurrenceVal = item.recurrence_type || legacyServiceFrequencyToRecurrence(item.frequency);
+  const recurrenceFallback = item.recurrence_type || legacyServiceFrequencyToRecurrence(item.frequency);
   const ctxBoxRecovery = { background: `${accentColor}0c`, border: `1px solid ${accentColor}22`, borderRadius: 10, padding: 14, marginTop: 12 };
   /** Label + control stack — tighter to mock vertical rhythm */
   const rf = { display: "flex", flexDirection: "column", gap: 6, minWidth: 0 };
-  const gridSchedule3 = { display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 16, marginBottom: 16, alignItems: "start" };
   /** Same 4-col track as recurrence row — Item type = 1 col, Session type = 3 cols */
   const gridSchedule4 = { display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 16, marginBottom: 16, alignItems: "start" };
   /** Same width as one field in the 4-col recurrence row (gap 16px → 3 gaps) */
@@ -1086,14 +1650,10 @@ function RecoveryServiceItem({ item, onChange, onRemove, accentColor = PILLARS.r
         )}
 
         {kind === "session" && (
-          <div style={gridSchedule3}>
+          <div style={gridSchedule4}>
             <div style={rf}>
               <label style={S.lbl}>Recurrence</label>
-              <select style={S.sel} value={recurrenceVal} onChange={(e) => u("recurrence_type", e.target.value)}>
-                {RECURRENCE_TYPES.map((r) => (
-                  <option key={r} value={r}>{RECURRENCE_LABELS[r] || r}</option>
-                ))}
-              </select>
+              <RecurrenceSelect item={item} onItemChange={onChange} recurrenceFallback={recurrenceFallback} />
             </div>
             <div style={rf}>
               <label style={S.lbl}>Starting at</label>
@@ -1103,6 +1663,11 @@ function RecoveryServiceItem({ item, onChange, onRemove, accentColor = PILLARS.r
               <label style={S.lbl}>Ending on</label>
               <input style={S.inp} type="date" value={item.end_date || ""} onChange={(e) => u("end_date", e.target.value)} />
             </div>
+            <ConciergeReminderField
+              itemId={item.id}
+              value={item.concierge_reminder_days}
+              onChange={(v) => u("concierge_reminder_days", v)}
+            />
           </div>
         )}
 
@@ -1110,11 +1675,7 @@ function RecoveryServiceItem({ item, onChange, onRemove, accentColor = PILLARS.r
           <div style={gridSchedule4}>
             <div style={rf}>
               <label style={S.lbl}>Recurrence</label>
-              <select style={S.sel} value={recurrenceVal} onChange={(e) => u("recurrence_type", e.target.value)}>
-                {RECURRENCE_TYPES.map((r) => (
-                  <option key={r} value={r}>{RECURRENCE_LABELS[r] || r}</option>
-                ))}
-              </select>
+              <RecurrenceSelect item={item} onItemChange={onChange} recurrenceFallback={recurrenceFallback} />
             </div>
             <div style={rf}>
               <label style={S.lbl}>Starting at</label>
@@ -1139,6 +1700,167 @@ function RecoveryServiceItem({ item, onChange, onRemove, accentColor = PILLARS.r
         </div>
 
         <div style={ctxBoxRecovery}>
+          <div style={{ ...S.lbl, marginBottom: 16 }}>Context fields</div>
+          <div style={{ marginBottom: 16 }}>
+            <div style={S.fldF}>
+              <label style={S.lbl}>The what</label>
+              <textarea style={S.ta} placeholder="What is this item? Describe it clearly and concisely." value={item.context_what || ""} onChange={(e) => u("context_what", e.target.value)} />
+            </div>
+          </div>
+          <div style={{ marginBottom: 16 }}>
+            <div style={S.fldF}>
+              <label style={S.lbl}>The expectations</label>
+              <textarea style={S.ta} placeholder="What outcomes or results should the patient expect from this?" value={item.context_expectations || ""} onChange={(e) => u("context_expectations", e.target.value)} />
+            </div>
+          </div>
+          <div style={S.fldF}>
+            <label style={S.lbl}>The why</label>
+            <textarea style={S.ta} placeholder="Why is this included in the protocol? What's the clinical rationale?" value={item.context_why || ""} onChange={(e) => u("context_why", e.target.value)} />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function NutritionItemCard({ item, onChange, onRemove, accentColor = PILLARS.nutrition.color }) {
+  const u = (f, v) => onChange({ ...item, [f]: v });
+  const [iconOpen, setIconOpen] = useState(false);
+  const iconId = item.icon_id || DEFAULT_SUPPLEMENT_ICON_ID;
+  const kind = item.nutrition_item_type || "task";
+  const recurrenceFallback = item.recurrence_type || "custom";
+  const ctxBox = { background: `${accentColor}0c`, border: `1px solid ${accentColor}22`, borderRadius: 10, padding: 14, marginTop: 12 };
+  const rf = { display: "flex", flexDirection: "column", gap: 6, minWidth: 0 };
+  const gridSchedule4 = { display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 16, marginBottom: 16, alignItems: "start" };
+  const itemTypeColMatchSchedule = { width: "calc((100% - 48px) / 4)", maxWidth: "100%", minWidth: 120, boxSizing: "border-box" };
+
+  return (
+    <div style={S.iRow}>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+          <button
+            type="button"
+            aria-label="Choose icon"
+            onClick={(e) => {
+              e.stopPropagation();
+              setIconOpen(true);
+            }}
+            style={{
+              width: 40,
+              height: 40,
+              flexShrink: 0,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              borderRadius: 8,
+              border: `1px solid ${V.bdr}`,
+              background: V.bgCard,
+              cursor: "pointer",
+              padding: 0,
+            }}
+          >
+            <SupplementIconGlyph id={iconId} size={22} />
+          </button>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <input
+              style={S.inp}
+              value={item.name || ""}
+              onChange={(e) => u("name", e.target.value)}
+              placeholder="e.g. 16:8 Intermittent Fasting"
+              aria-label="Item name"
+            />
+          </div>
+          <button type="button" style={{ ...S.btnD, flexShrink: 0 }} onClick={onRemove}>
+            Remove
+          </button>
+        </div>
+        {iconOpen && <SupplementIconPickerModal value={iconId} onChange={(id) => u("icon_id", id)} onClose={() => setIconOpen(false)} />}
+
+        {kind === "session" && (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 16, marginBottom: 16, alignItems: "flex-start" }}>
+            <div style={{ ...rf, ...itemTypeColMatchSchedule }}>
+              <label style={S.lbl}>Item type</label>
+              <select style={{ ...S.sel, width: "100%" }} value={kind} onChange={(e) => u("nutrition_item_type", e.target.value)}>
+                {NUTRITION_ITEM_TYPE_OPTIONS.map((t) => (
+                  <option key={t.value} value={t.value}>{t.label}</option>
+                ))}
+              </select>
+            </div>
+            <div style={{ ...rf, ...itemTypeColMatchSchedule }}>
+              <label style={S.lbl}>Session type</label>
+              <select style={{ ...S.sel, width: "100%" }} value={item.nutrition_session_type || "Consultation"} onChange={(e) => u("nutrition_session_type", e.target.value)}>
+                {NUTRITION_SESSION_TYPES.map((st) => (
+                  <option key={st} value={st}>{st}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        )}
+
+        {kind === "task" && (
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ ...rf, ...itemTypeColMatchSchedule }}>
+              <label style={S.lbl}>Item type</label>
+              <select style={{ ...S.sel, width: "100%" }} value={kind} onChange={(e) => u("nutrition_item_type", e.target.value)}>
+                {NUTRITION_ITEM_TYPE_OPTIONS.map((t) => (
+                  <option key={t.value} value={t.value}>{t.label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        )}
+
+        {kind === "session" && (
+          <div style={gridSchedule4}>
+            <div style={rf}>
+              <label style={S.lbl}>Recurrence</label>
+              <RecurrenceSelect item={item} onItemChange={onChange} recurrenceFallback={recurrenceFallback} />
+            </div>
+            <div style={rf}>
+              <label style={S.lbl}>Starting at</label>
+              <input style={S.inp} type="date" value={item.start_date || ""} onChange={(e) => u("start_date", e.target.value)} />
+            </div>
+            <div style={rf}>
+              <label style={S.lbl}>Ending on</label>
+              <input style={S.inp} type="date" value={item.end_date || ""} onChange={(e) => u("end_date", e.target.value)} />
+            </div>
+            <ConciergeReminderField
+              itemId={item.id}
+              value={item.concierge_reminder_days}
+              onChange={(v) => u("concierge_reminder_days", v)}
+            />
+          </div>
+        )}
+
+        {kind === "task" && (
+          <div style={gridSchedule4}>
+            <div style={rf}>
+              <label style={S.lbl}>Recurrence</label>
+              <RecurrenceSelect item={item} onItemChange={onChange} recurrenceFallback={recurrenceFallback} />
+            </div>
+            <div style={rf}>
+              <label style={S.lbl}>Starting at</label>
+              <input style={S.inp} type="date" value={item.start_date || ""} onChange={(e) => u("start_date", e.target.value)} />
+            </div>
+            <div style={rf}>
+              <label style={S.lbl}>Ending on</label>
+              <input style={S.inp} type="date" value={item.end_date || ""} onChange={(e) => u("end_date", e.target.value)} />
+            </div>
+            <div style={rf}>
+              <label style={S.lbl}>Time</label>
+              <input style={S.inp} type="time" value={item.anchor_time || ""} onChange={(e) => u("anchor_time", e.target.value)} />
+            </div>
+          </div>
+        )}
+
+        <div style={{ marginBottom: 4 }}>
+          <div style={{ ...rf, width: "100%" }}>
+            <label style={S.lbl}>Instructions</label>
+            <textarea style={S.ta} value={item.instructions || ""} onChange={(e) => u("instructions", e.target.value)} />
+          </div>
+        </div>
+
+        <div style={ctxBox}>
           <div style={{ ...S.lbl, marginBottom: 16 }}>Context fields</div>
           <div style={{ marginBottom: 16 }}>
             <div style={S.fldF}>
@@ -1228,12 +1950,11 @@ function TrainingItemCard({ item, onChange, onRemove, onAddExercise, onAddFromCa
   const [iconOpen, setIconOpen] = useState(false);
   const iconId = item.icon_id || DEFAULT_SUPPLEMENT_ICON_ID;
   const kind = item.training_item_type || "task";
-  const recurrenceVal = item.recurrence_type || "weekly";
+  const recurrenceFallback = item.recurrence_type || "custom";
   const exs = item.exercises || [];
   const hasCardioRow = exs.some((ex) => (ex.muscle_group || "").toLowerCase() === "cardio");
   const isCardioExercise = (ex) => (ex.muscle_group || "").toLowerCase() === "cardio";
   const rf = { display: "flex", flexDirection: "column", gap: 6, minWidth: 0 };
-  const gridSchedule3 = { display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 16, marginBottom: 16, alignItems: "start" };
   const gridSchedule4 = { display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 16, marginBottom: 16, alignItems: "start" };
   const itemTypeColMatchSchedule = { width: "calc((100% - 48px) / 4)", maxWidth: "100%", minWidth: 120, boxSizing: "border-box" };
   const ctxBoxTraining = { background: `${PILLARS.training.color}0c`, border: `1px solid ${PILLARS.training.color}22`, borderRadius: 10, padding: 14, marginTop: 12 };
@@ -1328,14 +2049,10 @@ function TrainingItemCard({ item, onChange, onRemove, onAddExercise, onAddFromCa
         )}
 
         {kind === "session" && (
-          <div style={gridSchedule3}>
+          <div style={gridSchedule4}>
             <div style={rf}>
               <label style={S.lbl}>Recurrence</label>
-              <select style={S.sel} value={recurrenceVal} onChange={(e) => u("recurrence_type", e.target.value)}>
-                {RECURRENCE_TYPES.map((r) => (
-                  <option key={r} value={r}>{RECURRENCE_LABELS[r] || r}</option>
-                ))}
-              </select>
+              <RecurrenceSelect item={item} onItemChange={onChange} recurrenceFallback={recurrenceFallback} />
             </div>
             <div style={rf}>
               <label style={S.lbl}>Starting at</label>
@@ -1345,6 +2062,11 @@ function TrainingItemCard({ item, onChange, onRemove, onAddExercise, onAddFromCa
               <label style={S.lbl}>Ending on</label>
               <input style={S.inp} type="date" value={item.end_date || ""} onChange={(e) => u("end_date", e.target.value)} />
             </div>
+            <ConciergeReminderField
+              itemId={item.id}
+              value={item.concierge_reminder_days}
+              onChange={(v) => u("concierge_reminder_days", v)}
+            />
           </div>
         )}
 
@@ -1352,11 +2074,7 @@ function TrainingItemCard({ item, onChange, onRemove, onAddExercise, onAddFromCa
           <div style={gridSchedule4}>
             <div style={rf}>
               <label style={S.lbl}>Recurrence</label>
-              <select style={S.sel} value={recurrenceVal} onChange={(e) => u("recurrence_type", e.target.value)}>
-                {RECURRENCE_TYPES.map((r) => (
-                  <option key={r} value={r}>{RECURRENCE_LABELS[r] || r}</option>
-                ))}
-              </select>
+              <RecurrenceSelect item={item} onItemChange={onChange} recurrenceFallback={recurrenceFallback} />
             </div>
             <div style={rf}>
               <label style={S.lbl}>Starting at</label>
@@ -1401,6 +2119,7 @@ function TrainingItemCard({ item, onChange, onRemove, onAddExercise, onAddFromCa
               <span style={{ color: V.txD, fontSize: 10, fontWeight: 600, width: 50, textAlign: "center", textTransform: "uppercase" }}>Reps</span>
               <span style={{ color: V.txD, fontSize: 10, fontWeight: 600, width: 12 }} />
               <span style={{ color: V.txD, fontSize: 10, fontWeight: 600, width: 70, textAlign: "center", textTransform: "uppercase" }}>Weight</span>
+              <span style={{ color: V.txD, fontSize: 10, fontWeight: 600, width: 72, textAlign: "center", textTransform: "uppercase", flexShrink: 0 }}>Level</span>
               {hasCardioRow && (
                 <span style={{ color: V.txD, fontSize: 10, fontWeight: 600, width: 96, textAlign: "center", textTransform: "uppercase", flexShrink: 0 }}>Time</span>
               )}
@@ -1432,6 +2151,13 @@ function TrainingItemCard({ item, onChange, onRemove, onAddExercise, onAddFromCa
                 <input style={{ ...S.inp, width: 50, textAlign: "center", padding: "4px" }} value={ex.reps || ""} onChange={(e) => updateExerciseRow(i, { reps: e.target.value })} />
                 <span style={{ color: V.txD, fontSize: 11 }}>@</span>
                 <input style={{ ...S.inp, width: 70, textAlign: "center", padding: "4px" }} value={ex.target_weight || ""} onChange={(e) => updateExerciseRow(i, { target_weight: e.target.value })} />
+                <input
+                  style={{ ...S.inp, width: 72, textAlign: "center", padding: "4px", fontSize: 12, flexShrink: 0 }}
+                  value={ex.level ?? ""}
+                  placeholder="e.g. 2"
+                  onChange={(e) => updateExerciseRow(i, { level: e.target.value })}
+                  aria-label="Complexity level"
+                />
                 {hasCardioRow &&
                   (isCardioExercise(ex) ? (
                     <input
@@ -1487,17 +2213,25 @@ function TrainingItemCard({ item, onChange, onRemove, onAddExercise, onAddFromCa
 }
 
 export default function ProtocolBuilder() {
+  const router = useRouter();
   const [meta, setMeta] = useState({ name: "", clinical_objective: "", clinical_use_case: "", eligibility_criteria: "", contraindications: "", duration: "", status: "draft" });
   const [sections, setSections] = useState([]);
   const [catalogModal, setCatalogModal] = useState(null);
   const [activeSec, setActiveSec] = useState(null);
+  const [nutritionCatalogTargetItemId, setNutritionCatalogTargetItemId] = useState(null);
   const [templateModal, setTemplateModal] = useState(false);
   const [collapsed, setCollapsed] = useState({});
   const [activeTab, setActiveTab] = useState("all");
 
+  const saveProtocolAndNavigate = (status) => {
+    const name = (meta.name || "").trim() || "Untitled protocol";
+    addUserProtocol({ name, status });
+    router.push("/protocols");
+  };
+
   const toggle = (id) => setCollapsed((p) => ({ ...p, [id]: !p[id] }));
   const addSection = (pillar) =>
-    setSections([...sections, { id: gid(), pillar, name: PILLARS[pillar].label, items: [], nutrition: pillar === "nutrition" ? {} : null, training: null }]);
+    setSections([...sections, { id: gid(), pillar, name: PILLARS[pillar].label, items: [], nutrition: null, training: null }]);
   const removeSection = (id) => setSections(sections.filter((s) => s.id !== id));
   const updateSection = (id, u) => setSections(sections.map((s) => (s.id === id ? { ...s, ...u } : s)));
   const addItem = (secId, ci, type) => {
@@ -1524,8 +2258,9 @@ export default function ProtocolBuilder() {
                   ? "Hyperbaric"
                   : guessRecoverySessionType(ci.name),
               icon_id: DEFAULT_SUPPLEMENT_ICON_ID,
-              recurrence_type: "weekly",
+              recurrence_type: "custom",
               anchor_time: "",
+              concierge_reminder_days: "",
               context_what: "",
               context_expectations: "",
               context_why: "",
@@ -1557,6 +2292,7 @@ export default function ProtocolBuilder() {
     sets: "3",
     reps: "8-12",
     target_weight: "",
+    level: "",
     muscle_group: ex.muscle_group,
     ...((ex.muscle_group || "").toLowerCase() === "cardio" ? { duration: "" } : {}),
   });
@@ -1572,6 +2308,7 @@ export default function ProtocolBuilder() {
           sets: "3",
           reps: "8-12",
           target_weight: "",
+          level: "",
           muscle_group: tItem.muscle_group,
           ...((tItem.muscle_group || "").toLowerCase() === "cardio" ? { duration: "" } : {}),
         },
@@ -1594,7 +2331,7 @@ export default function ProtocolBuilder() {
         catalogKind === "supplements"
           ? { id: gid(), type: "supplement", catalog_id: ci.id, name: ci.name, supplement_category: ci.category, icon_id: DEFAULT_SUPPLEMENT_ICON_ID, dosage: ci.defaults?.dosage || "", route: ci.defaults?.route || "oral", frequency: ci.defaults?.frequency || "", instructions: ci.defaults?.instructions || "", cycle: "", duration: "", recurrence_type: "daily", anchor_time: "", start_date: "", end_date: "", context_what: "", context_expectations: "", context_why: "" }
           : ["recovery", "regeneration", "diagnostics"].includes(pillar)
-            ? { id: gid(), type: "service", catalog_id: ci.id, name: ci.name, service_pillar: ci.pillar, duration_minutes: ci.duration, frequency: "weekly", preferred_window: "", notes: "", start_date: "", end_date: "", recovery_item_type: "session", recovery_session_type: pillar === "diagnostics" ? guessDiagnosticsSessionType(ci.name) : pillar === "regeneration" && (ci.name || "").toLowerCase().includes("hyperbaric") ? "Hyperbaric" : guessRecoverySessionType(ci.name), icon_id: DEFAULT_SUPPLEMENT_ICON_ID, recurrence_type: "weekly", anchor_time: "", context_what: "", context_expectations: "", context_why: "" }
+            ? { id: gid(), type: "service", catalog_id: ci.id, name: ci.name, service_pillar: ci.pillar, duration_minutes: ci.duration, frequency: "weekly", preferred_window: "", notes: "", start_date: "", end_date: "", recovery_item_type: "session", recovery_session_type: pillar === "diagnostics" ? guessDiagnosticsSessionType(ci.name) : pillar === "regeneration" && (ci.name || "").toLowerCase().includes("hyperbaric") ? "Hyperbaric" : guessRecoverySessionType(ci.name), icon_id: DEFAULT_SUPPLEMENT_ICON_ID, recurrence_type: "custom", anchor_time: "", concierge_reminder_days: "", context_what: "", context_expectations: "", context_why: "" }
             : { id: gid(), type: "service", catalog_id: ci.id, name: ci.name, service_pillar: ci.pillar, duration_minutes: ci.duration, frequency: "weekly", preferred_window: "", notes: "", start_date: "", end_date: "" },
       );
       return { ...s, items: [...s.items, ...additions] };
@@ -1636,10 +2373,11 @@ export default function ProtocolBuilder() {
           icon_id: DEFAULT_SUPPLEMENT_ICON_ID,
           name: "",
           training_item_type: "task",
-          recurrence_type: "weekly",
+          recurrence_type: "custom",
           start_date: "",
           end_date: "",
           anchor_time: "",
+          concierge_reminder_days: "",
           instructions: "",
           exercises: [],
           context_what: "",
@@ -1660,10 +2398,11 @@ export default function ProtocolBuilder() {
       icon_id: DEFAULT_SUPPLEMENT_ICON_ID,
       name: "",
       training_item_type: "task",
-      recurrence_type: "weekly",
+      recurrence_type: "custom",
       start_date: "",
       end_date: "",
       anchor_time: "",
+      concierge_reminder_days: "",
       instructions: "",
       exercises: [],
       context_what: "",
@@ -1679,6 +2418,26 @@ export default function ProtocolBuilder() {
     );
     setActiveSec(`ti-${secId}-${newId}`);
     setCatalogModal("training-catalog");
+  };
+
+  const addBlankNutritionItem = (secId) => {
+    setSections(
+      sections.map((s) => {
+        if (s.id !== secId || s.pillar !== "nutrition") return s;
+        return { ...s, items: [...(s.items || []), blankNutritionItem()] };
+      }),
+    );
+  };
+
+  const addNutritionItemAndOpenCatalog = (secId) => {
+    const newId = gid();
+    const blank = blankNutritionItem({ id: newId });
+    setSections((prev) =>
+      prev.map((s) => (s.id === secId && s.pillar === "nutrition" ? { ...s, items: [...(s.items || []), blank] } : s)),
+    );
+    setActiveSec(secId);
+    setNutritionCatalogTargetItemId(newId);
+    setCatalogModal("nutrition-catalog");
   };
 
   const addBlankSupplement = (secId) => {
@@ -1708,8 +2467,9 @@ export default function ProtocolBuilder() {
             recovery_item_type: "session",
             recovery_session_type: s.pillar === "diagnostics" ? "MRI Progress Scan" : s.pillar === "regeneration" ? "Hyperbaric" : "Massages",
             icon_id: DEFAULT_SUPPLEMENT_ICON_ID,
-            recurrence_type: "weekly",
+            recurrence_type: "custom",
             anchor_time: "",
+            concierge_reminder_days: "",
             context_what: "",
             context_expectations: "",
             context_why: "",
@@ -2233,7 +2993,8 @@ export default function ProtocolBuilder() {
 
   const total = sections.reduce((acc, sec) => {
     if (sec.pillar === "training") return acc + migrateTrainingItems(sec).length;
-    return acc + sec.items.length + (sec.nutrition ? 1 : 0);
+    if (sec.pillar === "nutrition") return acc + countNutritionItems(sec);
+    return acc + (sec.items || []).length + (sec.nutrition ? 1 : 0);
   }, 0);
   const pCounts = {};
   sections.forEach((s) => { pCounts[s.pillar] = (pCounts[s.pillar] || 0) + 1; });
@@ -2256,9 +3017,19 @@ export default function ProtocolBuilder() {
           </div>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
-          <button style={S.btnS}>Save draft</button>
-          <button style={{ ...S.btnS, color: V.warn, borderColor: `${V.warn}40` }}>Submit for review</button>
-          <button style={S.btnP}>Publish</button>
+          <button type="button" style={S.btnS} onClick={() => saveProtocolAndNavigate("Draft")}>
+            Save draft
+          </button>
+          <button
+            type="button"
+            style={{ ...S.btnS, color: V.warn, borderColor: `${V.warn}40` }}
+            onClick={() => saveProtocolAndNavigate("Submitted for review")}
+          >
+            Submit for review
+          </button>
+          <button type="button" style={S.btnP} onClick={() => saveProtocolAndNavigate("Active")}>
+            Publish
+          </button>
         </div>
       </div>
 
@@ -2329,7 +3100,14 @@ export default function ProtocolBuilder() {
             </div>
 
             {/* Sections */}
-            {filtered.map((sec) => (
+            {filtered.map((sec) => {
+              const itemCount =
+                sec.pillar === "training"
+                  ? migrateTrainingItems(sec).length
+                  : sec.pillar === "nutrition"
+                    ? countNutritionItems(sec)
+                    : (sec.items || []).length;
+              return (
               <div key={sec.id} style={{ ...S.card, borderLeft: `3px solid ${PILLARS[sec.pillar]?.color || V.bdr}` }}>
                 <div style={S.cardH} onClick={() => toggle(sec.id)}>
                   <div style={{ display: "flex", alignItems: "center", minWidth: 0, flex: 1 }} onClick={(e) => e.stopPropagation()}>
@@ -2337,7 +3115,7 @@ export default function ProtocolBuilder() {
                   </div>
                   <div style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0 }}>
                     <span style={{ fontSize: 11, color: V.txD, whiteSpace: "nowrap" }}>
-                      {sec.pillar === "training" ? migrateTrainingItems(sec).length : sec.items.length} item{(sec.pillar === "training" ? migrateTrainingItems(sec).length : sec.items.length) !== 1 ? "s" : ""}
+                      {itemCount} item{itemCount !== 1 ? "s" : ""}
                     </span>
                     <button type="button" style={S.btnD} onClick={(e) => { e.stopPropagation(); removeSection(sec.id); }}>Remove</button>
                     <CollapseChevron expanded={!collapsed[sec.id]} />
@@ -2365,7 +3143,31 @@ export default function ProtocolBuilder() {
                         </div>
                       </>
                     )}
-                    {sec.pillar === "nutrition" && <NutritionEditor data={sec.nutrition || {}} onChange={(n) => updateSection(sec.id, { nutrition: n })} />}
+                    {sec.pillar === "nutrition" && (
+                      <>
+                        {(sec.items || [])
+                          .filter((it) => it.type === "nutrition")
+                          .map((it) => (
+                            <NutritionItemCard
+                              key={it.id}
+                              item={it}
+                              onChange={(u) => updateItem(sec.id, it.id, u)}
+                              onRemove={() => removeItem(sec.id, it.id)}
+                            />
+                          ))}
+                        {hasLegacyNutritionData(sec) && !sec.items?.some((it) => it.type === "nutrition") && (
+                          <NutritionEditor data={sec.nutrition || {}} onChange={(n) => updateSection(sec.id, { nutrition: n })} />
+                        )}
+                        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+                          <button type="button" style={S.btnAddNew} onClick={() => addBlankNutritionItem(sec.id)}>
+                            + Add New
+                          </button>
+                          <button type="button" style={S.btnAddCatalog} onClick={() => addNutritionItemAndOpenCatalog(sec.id)}>
+                            + Add from catalogue
+                          </button>
+                        </div>
+                      </>
+                    )}
                     {sec.pillar === "training" && (
                       <>
                         {migrateTrainingItems(sec).map((it) => (
@@ -2447,7 +3249,7 @@ export default function ProtocolBuilder() {
                     )}
                     {sec.pillar === "regeneration" && (
                       <>
-                        {sec.items.map((it) => (
+                        {(sec.items || []).map((it) => (
                           <RecoveryServiceItem
                             key={it.id}
                             item={it}
@@ -2477,7 +3279,8 @@ export default function ProtocolBuilder() {
                   </div>
                 )}
               </div>
-            ))}
+            );
+            })}
           </>
         )}
       </div>
@@ -2517,6 +3320,49 @@ export default function ProtocolBuilder() {
               if (tItem) additions.push(...resolveTrainingCatalogItem(tItem));
             }
             appendExerciseRowsToActiveTrainingItem(additions);
+          }}
+        />
+      )}
+      {catalogModal === "nutrition-catalog" && (
+        <NutritionCatalogModal
+          onClose={() => {
+            setNutritionCatalogTargetItemId(null);
+            setCatalogModal(null);
+          }}
+          onSelectItem={(row) => {
+            const filled = nutritionItemFromCatalogRow(row);
+            setSections((prev) =>
+              prev.map((s) => {
+                if (s.id !== activeSec || s.pillar !== "nutrition" || !nutritionCatalogTargetItemId) return s;
+                return {
+                  ...s,
+                  items: (s.items || []).map((it) => (it.id === nutritionCatalogTargetItemId ? { ...it, ...filled, id: it.id } : it)),
+                };
+              }),
+            );
+            setNutritionCatalogTargetItemId(null);
+            setCatalogModal(null);
+          }}
+          onSelectProgram={(prog) => {
+            const resolved = (prog.item_ids || []).map((id) => MOCK_NUTRITION_CATALOG_ITEMS.find((x) => x.id === id)).filter(Boolean);
+            const additions = resolved.map((r) => nutritionItemFromCatalogRow(r));
+            if (additions.length === 0) {
+              setNutritionCatalogTargetItemId(null);
+              setCatalogModal(null);
+              return;
+            }
+            setSections((prev) =>
+              prev.map((s) => {
+                if (s.id !== activeSec || s.pillar !== "nutrition") return s;
+                let items = [...(s.items || [])];
+                if (nutritionCatalogTargetItemId) {
+                  items = items.filter((it) => it.id !== nutritionCatalogTargetItemId);
+                }
+                return { ...s, items: [...items, ...additions] };
+              }),
+            );
+            setNutritionCatalogTargetItemId(null);
+            setCatalogModal(null);
           }}
         />
       )}

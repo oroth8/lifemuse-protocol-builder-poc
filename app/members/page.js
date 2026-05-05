@@ -41,10 +41,7 @@ export default function MembersPage() {
 
           <div className="mt-5 flex flex-col gap-4 sm:mt-6 sm:flex-row sm:items-center sm:justify-between">
             <h1 className="text-3xl font-bold tracking-tight text-gray-900">Members</h1>
-            <button
-              type="button"
-              className="inline-flex items-center justify-center gap-2 rounded-lg bg-black px-5 py-2.5 text-sm font-semibold text-white shadow-[0_4px_14px_rgba(0,0,0,0.15)] transition-colors hover:bg-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black"
-            >
+            <button type="button" className="btn-lifemuse-primary gap-2">
               <IconPlus />
               Create new member
             </button>

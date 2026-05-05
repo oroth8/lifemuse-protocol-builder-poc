@@ -14,6 +14,10 @@ pnpm dev
 bun dev
 ```
 
+Run these commands from **this project folder** (the one that contains `package.json`). Other folders in the same parent directory may be static sites without Node tooling; `npm run dev` there will fail with a missing `package.json` error.
+
+`npm run dev` uses webpack by default to avoid Turbopack persistence issues on some macOS setups. Use `npm run dev:turbo` if you prefer Turbopack.
+
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
 You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
@@ -22,7 +26,7 @@ This project uses [`next/font`](https://nextjs.org/docs/app/building-your-applic
 
 ## Learn More
 
-To learn more about Next.js, take a look at the following resources:  aaa
+To learn more about Next.js, take a look at the following resources:
 
 - [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
 - [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.

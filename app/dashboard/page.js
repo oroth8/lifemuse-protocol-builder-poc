@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { AppShell } from "../components/AppShell";
-import { NeedsAttentionTable } from "./NeedsAttentionTable";
+import { DashboardWelcomeHeading } from "./DashboardWelcomeHeading";
+import { NeedsAttentionSection } from "./NeedsAttentionSection";
 import { ReminderNotificationsTable } from "./ReminderNotificationsTable";
 
 const REMINDERS = [
@@ -57,7 +58,7 @@ export default function DashboardPage() {
       <div className="flex-1 overflow-auto p-6 lg:p-8">
         <div className="mx-auto max-w-6xl space-y-8">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-gray-900 sm:text-3xl">Welcome, Stephen!</h1>
+            <DashboardWelcomeHeading />
             <p className="mt-2 max-w-2xl text-sm text-gray-600 sm:text-base">
               Here is a snapshot of your reminders and items that need your attention.
             </p>
@@ -74,26 +75,7 @@ export default function DashboardPage() {
             <div className="border-b border-gray-100 px-6 py-4">
               <h2 className="text-base font-semibold text-gray-900">Needs attention</h2>
             </div>
-            <NeedsAttentionTable rows={NEEDS_ATTENTION} />
-            <div className="flex justify-center border-t border-gray-100 px-6 py-4">
-              <nav className="flex items-center gap-2 text-sm text-gray-600" aria-label="Pagination">
-                <button type="button" className="rounded px-2 py-1 hover:bg-gray-100" aria-label="Previous page">
-                  &lt;
-                </button>
-                {[1, 2, 3, 4, 5].map((n) => (
-                  <button
-                    key={n}
-                    type="button"
-                    className={`min-w-8 rounded px-2 py-1 ${n === 1 ? "bg-gray-900 font-medium text-white" : "hover:bg-gray-100"}`}
-                  >
-                    {n}
-                  </button>
-                ))}
-                <button type="button" className="rounded px-2 py-1 hover:bg-gray-100" aria-label="Next page">
-                  &gt;
-                </button>
-              </nav>
-            </div>
+            <NeedsAttentionSection rows={NEEDS_ATTENTION} />
           </section>
         </div>
       </div>

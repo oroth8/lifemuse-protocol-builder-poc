@@ -1,8 +1,9 @@
 @import "tailwindcss";
 
 @layer components {
+  /* Shared app buttons: compact radius, single charcoal primary (#2d2d2d). */
   .btn-lifemuse-primary {
-    @apply inline-flex items-center justify-center rounded-xl px-8 py-3 text-sm font-bold text-white shadow-[0_4px_14px_rgba(0,0,0,0.18)] transition-colors;
+    @apply inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold text-white transition-colors;
     background-color: #2d2d2d;
   }
   .btn-lifemuse-primary:hover {
@@ -11,6 +12,29 @@
   .btn-lifemuse-primary:focus-visible {
     outline: 2px solid #2d2d2d;
     outline-offset: 2px;
+  }
+
+  .btn-lifemuse-secondary {
+    @apply inline-flex items-center justify-center rounded-lg border border-[#2d2d2d] bg-white px-4 py-2 text-sm font-semibold text-[#2d2d2d] transition-colors hover:bg-gray-50;
+  }
+  .btn-lifemuse-secondary:focus-visible {
+    outline: 2px solid #2d2d2d;
+    outline-offset: 2px;
+  }
+
+  .btn-lifemuse-danger {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 transition-colors hover:bg-red-100;
+  }
+  .btn-lifemuse-danger:focus-visible {
+    outline: 2px solid #b91c1c;
+    outline-offset: 2px;
+  }
+
+  .btn-table-page {
+    @apply inline-flex min-h-8 min-w-8 items-center justify-center rounded-lg text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 disabled:pointer-events-none disabled:opacity-40;
+  }
+  .btn-table-page-active {
+    @apply bg-[#2d2d2d] text-white hover:bg-[#3a3a3a];
   }
 }
 
