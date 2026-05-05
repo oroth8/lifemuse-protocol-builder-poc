@@ -58,24 +58,31 @@ function PrototypeRoleControls() {
 
   return (
     <div
-      className="fixed bottom-4 right-4 z-[100] w-[min(100vw-2rem,280px)] rounded-xl border border-gray-200 bg-white shadow-lg"
+      className="fixed bottom-4 right-4 z-[100] w-[min(100vw-2rem,280px)] rounded-lg border border-gray-200 bg-white shadow-md"
       role="region"
-      aria-label="Prototype role switcher"
+      aria-label="Prototype controls"
     >
-      <div className="flex items-center justify-between gap-2 border-b border-gray-100 px-3 py-2">
-        <div className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">Prototype</div>
+      <div className="flex items-center justify-between gap-2 border-b border-gray-100 px-3 py-2.5">
+        <div className="min-w-0 flex-1">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[#5E6980]">Prototype Controls</div>
+          {!expanded ? (
+            <div className="truncate text-xs font-medium text-gray-900" title={`${role.roleLabel} · ${role.firstName}`}>
+              {role.firstName} · {role.roleLabel}
+            </div>
+          ) : null}
+        </div>
         <button
           type="button"
           onClick={toggleExpanded}
-          className="flex shrink-0 rounded-md p-1 text-gray-500 hover:bg-gray-100 hover:text-gray-800"
+          className="flex shrink-0 rounded-lg p-1.5 text-gray-500 hover:bg-gray-100 hover:text-[#2d2d2d]"
           aria-expanded={expanded}
           aria-label={expanded ? "Collapse prototype panel" : "Expand prototype panel"}
         >
           <IconChevronDown className={`transition-transform duration-200 ${expanded ? "rotate-0" : "rotate-180"}`} />
         </button>
       </div>
-      {expanded && (
-        <div className="space-y-2 p-3 pt-2">
+      {expanded ? (
+        <div className="space-y-2 p-3">
           {roles.map((r) => {
             const selected = r.id === role.id;
             return (
@@ -85,7 +92,7 @@ function PrototypeRoleControls() {
                 onClick={() => setRoleId(r.id)}
                 className={`flex w-full flex-col items-start rounded-lg border px-3 py-2 text-left text-sm transition-colors ${
                   selected
-                    ? "border-amber-600/50 bg-amber-50 text-gray-900"
+                    ? "border-[#2d2d2d]/40 bg-[#2d2d2d]/10 text-gray-900"
                     : "border-gray-100 bg-gray-50/80 text-gray-700 hover:border-gray-200 hover:bg-gray-50"
                 }`}
               >
@@ -95,7 +102,7 @@ function PrototypeRoleControls() {
             );
           })}
         </div>
-      )}
+      ) : null}
     </div>
   );
 }
