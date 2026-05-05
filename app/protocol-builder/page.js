@@ -1,5 +1,10 @@
-import ProtocolBuilder from "../components/ProtocolBuilder";
+import { Suspense } from "react";
+import ProtocolBuilderPageClient from "./ProtocolBuilderPageClient";
 
 export default function ProtocolBuilderPage() {
-  return <ProtocolBuilder />;
+  return (
+    <Suspense fallback={null}>
+      <ProtocolBuilderPageClient />
+    </Suspense>
+  );
 }

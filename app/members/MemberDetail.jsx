@@ -509,7 +509,18 @@ export function MemberDetail({ member }) {
               <TableFooter count={noteSorted.length} />
             </CollapsibleSection>
 
-            <CollapsibleSection id="care" title="Care plan" actionLabel="Add care item">
+            <CollapsibleSection
+              id="care"
+              title="Care plan"
+              headerAction={
+                <Link
+                  href={`/members/${member.id}/care-plan`}
+                  className="inline-flex shrink-0 items-center justify-center rounded-lg bg-[#2d2d2d] px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-[#3a3a3a]"
+                >
+                  Manage care plan
+                </Link>
+              }
+            >
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[1000px] text-left text-sm">
                   <thead>

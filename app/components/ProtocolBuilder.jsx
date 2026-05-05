@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { addUserProtocol } from "../lib/userProtocols";
 import { createPortal } from "react-dom";
 import { DEFAULT_SUPPLEMENT_ICON_ID, SupplementIconGlyph, SupplementIconPickerModal } from "./protocolSupplementIcons";
@@ -2212,8 +2212,9 @@ function TrainingItemCard({ item, onChange, onRemove, onAddExercise, onAddFromCa
   );
 }
 
-export default function ProtocolBuilder() {
+export default function ProtocolBuilder({ variant = "default" }) {
   const router = useRouter();
+  const isCareReview = variant === "care-review";
   const [meta, setMeta] = useState({ name: "", clinical_objective: "", clinical_use_case: "", eligibility_criteria: "", contraindications: "", duration: "", status: "draft" });
   const [sections, setSections] = useState([]);
   const [catalogModal, setCatalogModal] = useState(null);
@@ -2222,11 +2223,12 @@ export default function ProtocolBuilder() {
   const [templateModal, setTemplateModal] = useState(false);
   const [collapsed, setCollapsed] = useState({});
   const [activeTab, setActiveTab] = useState("all");
+  const careReviewBootstrap = useRef(false);
 
   const saveProtocolAndNavigate = (status) => {
     const name = (meta.name || "").trim() || "Untitled protocol";
     addUserProtocol({ name, status });
-    router.push("/protocols");
+    router.push(isCareReview ? "/dashboard" : "/protocols");
   };
 
   const toggle = (id) => setCollapsed((p) => ({ ...p, [id]: !p[id] }));
@@ -2991,6 +2993,29 @@ export default function ProtocolBuilder() {
     setTemplateModal(false);
   };
 
+  useEffect(() => {
+    if (!isCareReview || careReviewBootstrap.current) return;
+    careReviewBootstrap.current = true;
+    loadTemplate({
+      id: "pt-002",
+      name: "Metabolic & gut healing protocol — Casey Brown",
+      description:
+        "12-week gut repair with mucosal support, nutrition plan, labs, and regeneration services — pending care team approval.",
+    });
+    setMeta((m) => ({
+      ...m,
+      name: "Metabolic & gut healing protocol — Casey Brown",
+      clinical_objective:
+        "Repair intestinal permeability and rebalance inflammation while supporting lipid and glucose markers through phased nutrition, binders, omega-3, curcumin, and follow-up labs.",
+      clinical_use_case:
+        "Casey Brown — intake complete; supplement stack requires care team approval before member activation.",
+      eligibility_criteria: "Adults 21–70; baseline GI-MAP and metabolic panel on file; no contraindicated medications.",
+      contraindications: "Pregnancy; allergy to fish or curcumin; active GI bleed; uncontrolled anticoagulation.",
+      duration: "12 weeks",
+      status: "pending_review",
+    }));
+  }, [isCareReview]);
+
   const total = sections.reduce((acc, sec) => {
     if (sec.pillar === "training") return acc + migrateTrainingItems(sec).length;
     if (sec.pillar === "nutrition") return acc + countNutritionItems(sec);
@@ -3004,7 +3029,7 @@ export default function ProtocolBuilder() {
     <div style={S.root}>
       <div style={S.topBar}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <Link href="/protocols" aria-label="Back to protocols" style={S.backBtn}>
+          <Link href={isCareReview ? "/dashboard" : "/protocols"} aria-label={isCareReview ? "Back to dashboard" : "Back to protocols"} style={S.backBtn}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
               <path d="M15 18l-6-6 6-6" />
             </svg>
@@ -3020,16 +3045,24 @@ export default function ProtocolBuilder() {
           <button type="button" style={S.btnS} onClick={() => saveProtocolAndNavigate("Draft")}>
             Save draft
           </button>
-          <button
-            type="button"
-            style={{ ...S.btnS, color: V.warn, borderColor: `${V.warn}40` }}
-            onClick={() => saveProtocolAndNavigate("Submitted for review")}
-          >
-            Submit for review
-          </button>
-          <button type="button" style={S.btnP} onClick={() => saveProtocolAndNavigate("Active")}>
-            Publish
-          </button>
+          {isCareReview ? (
+            <button type="button" style={S.btnP} onClick={() => saveProtocolAndNavigate("Active")}>
+              Approve
+            </button>
+          ) : (
+            <>
+              <button
+                type="button"
+                style={{ ...S.btnS, color: V.warn, borderColor: `${V.warn}40` }}
+                onClick={() => saveProtocolAndNavigate("Submitted for review")}
+              >
+                Submit for review
+              </button>
+              <button type="button" style={S.btnP} onClick={() => saveProtocolAndNavigate("Active")}>
+                Publish
+              </button>
+            </>
+          )}
         </div>
       </div>
 
