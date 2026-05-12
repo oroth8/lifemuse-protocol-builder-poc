@@ -12,18 +12,20 @@ function IconMenu() {
   );
 }
 
-export function AppTopBar({ onMenuClick, menuAriaLabel, menuExpanded }) {
+export function AppTopBar({ onMenuClick, menuAriaLabel, menuExpanded, showNavToggle = true }) {
   return (
     <header className="flex h-14 shrink-0 items-center gap-2 border-b border-[#e0e0e0] bg-white px-4">
-      <button
-        type="button"
-        className="rounded-md p-2 text-gray-900 hover:bg-gray-100"
-        aria-label={menuAriaLabel}
-        aria-expanded={menuExpanded}
-        onClick={onMenuClick}
-      >
-        <IconMenu />
-      </button>
+      {showNavToggle ? (
+        <button
+          type="button"
+          className="rounded-md p-2 text-gray-900 hover:bg-gray-100"
+          aria-label={menuAriaLabel}
+          aria-expanded={menuExpanded}
+          onClick={onMenuClick}
+        >
+          <IconMenu />
+        </button>
+      ) : null}
       <Link href="/dashboard" className="font-sans text-lg font-semibold tracking-normal text-gray-900">
         LIFEMUSE
       </Link>

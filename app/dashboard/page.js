@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { AppShell } from "../components/AppShell";
 import { DashboardWelcomeHeading } from "./DashboardWelcomeHeading";
 import { NeedsAttentionSection } from "./NeedsAttentionSection";
@@ -17,44 +16,9 @@ const NEEDS_ATTENTION = [
   { date: "Apr 23, 2026", member: "Alex R.", task: "Sign consent", description: "Training block consent form outstanding.", status: "Awaiting Approval" },
 ];
 
-function IconSearch() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
-      <circle cx="11" cy="11" r="8" />
-      <path d="m21 21-4.3-4.3" />
-    </svg>
-  );
-}
-
 export default function DashboardPage() {
   return (
     <AppShell mainClassName="flex min-h-screen min-w-0 flex-1 flex-col bg-[#f4f4f4]">
-      <header className="flex shrink-0 items-center gap-4 border-b border-black/5 bg-white px-6 py-4">
-        <nav className="text-sm text-gray-500" aria-label="Breadcrumb">
-          <ol className="flex items-center gap-2">
-            <li>
-              <Link href="/dashboard" className="hover:text-gray-800">
-                Home
-              </Link>
-            </li>
-            <li aria-hidden>/</li>
-            <li className="font-medium text-gray-900">Dashboard</li>
-          </ol>
-        </nav>
-        <div className="ml-auto flex max-w-md flex-1 justify-end sm:max-w-xs">
-          <label className="relative w-full">
-            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-              <IconSearch />
-            </span>
-            <input
-              type="search"
-              placeholder="Search"
-              className="w-full rounded-full border border-gray-200 bg-gray-50 py-2 pl-10 pr-4 text-sm text-gray-900 outline-none ring-0 placeholder:text-gray-400 focus:border-gray-300 focus:bg-white"
-            />
-          </label>
-        </div>
-      </header>
-
       <div className="flex-1 overflow-auto p-6 lg:p-8">
         <div className="mx-auto max-w-6xl space-y-8">
           <div>

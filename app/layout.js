@@ -1,5 +1,5 @@
 import { Geist, Geist_Mono } from "next/font/google";
-import { PrototypeRoleProvider } from "./components/PrototypeRoleProvider";
+import { PrototypeAuthProvider } from "./components/PrototypeAuthProvider";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -24,7 +24,7 @@ export default function RootLayout({ children }) {
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        <PrototypeRoleProvider>{children}</PrototypeRoleProvider>
+        <PrototypeAuthProvider>{children}</PrototypeAuthProvider>
       </body>
     </html>
   );

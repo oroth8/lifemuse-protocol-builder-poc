@@ -1,19 +1,11 @@
 import Link from "next/link";
 import { AppShell } from "../components/AppShell";
-import { RemindersPageHeader } from "./RemindersPageHeader";
 import { REMINDERS_SENT } from "./remindersData";
 import { RemindersTable } from "./RemindersTable";
 
 export default function RemindersPage() {
   return (
     <AppShell mainClassName="flex min-h-screen min-w-0 flex-1 flex-col bg-[#f4f4f4]">
-      <RemindersPageHeader
-        crumbs={[
-          { label: "Home", href: "/dashboard" },
-          { label: "Reminders" },
-        ]}
-      />
-
       <div className="flex-1 overflow-auto p-6 lg:p-8">
         <div className="mx-auto max-w-6xl space-y-6">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">

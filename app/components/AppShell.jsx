@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { usePrototypeAuth } from "./PrototypeAuthProvider";
 import { useEffect, useState } from "react";
 import { AppTopBar } from "./AppTopBar";
 
@@ -53,6 +54,40 @@ function IconMessage({ className }) {
   );
 }
 
+function IconPrograms({ className }) {
+  return (
+    <svg className={className} width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+      <polyline points="14 2 14 8 20 8" />
+      <line x1="16" x2="8" y1="13" y2="13" />
+      <line x1="16" x2="8" y1="17" y2="17" />
+      <line x1="10" x2="8" y1="9" y2="9" />
+    </svg>
+  );
+}
+
+function IconItems({ className }) {
+  return (
+    <svg className={className} width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <line x1="8" x2="21" y1="6" y2="6" />
+      <line x1="8" x2="21" y1="12" y2="12" />
+      <line x1="8" x2="21" y1="18" y2="18" />
+      <line x1="3" x2="3.01" y1="6" y2="6" />
+      <line x1="3" x2="3.01" y1="12" y2="12" />
+      <line x1="3" x2="3.01" y1="18" y2="18" />
+    </svg>
+  );
+}
+
+function IconCategories({ className }) {
+  return (
+    <svg className={className} width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
+      <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
+    </svg>
+  );
+}
+
 function IconSignOut({ className }) {
   return (
     <svg className={className} width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -71,10 +106,14 @@ const NAV = [
   { href: "/protocols", label: "Protocols", Icon: IconGrid },
   { href: "/members", label: "Members", Icon: IconUsers },
   { href: "/messages", label: "Messages", Icon: IconMessage },
+  { href: "/programs", label: "Programs", Icon: IconPrograms },
+  { href: "/items", label: "Items", Icon: IconItems },
+  { href: "/categories", label: "Categories", Icon: IconCategories },
 ];
 
-export function AppShell({ children, mainClassName }) {
+export function AppShell({ children, mainClassName, hideSidebar = false, hideTopBar = false }) {
   const pathname = usePathname();
+  const { logout } = usePrototypeAuth();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [isLg, setIsLg] = useState(false);
@@ -112,9 +151,16 @@ export function AppShell({ children, mainClassName }) {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <AppTopBar onMenuClick={toggleNav} menuAriaLabel={menuAriaLabel} menuExpanded={menuExpanded} />
+      {!hideTopBar ? (
+        <AppTopBar
+          onMenuClick={toggleNav}
+          menuAriaLabel={menuAriaLabel}
+          menuExpanded={menuExpanded}
+          showNavToggle={!hideSidebar}
+        />
+      ) : null}
       <div className="relative flex min-h-0 min-w-0 flex-1">
-        {mobileNavOpen ? (
+        {!hideSidebar && mobileNavOpen ? (
           <button
             type="button"
             className="fixed inset-0 top-14 z-40 bg-black/40 lg:hidden"
@@ -122,39 +168,42 @@ export function AppShell({ children, mainClassName }) {
             onClick={() => setMobileNavOpen(false)}
           />
         ) : null}
-        <aside
-          className={`fixed top-14 bottom-0 z-50 flex shrink-0 flex-col bg-black py-6 text-white transition-[width,transform,padding] duration-200 ease-out lg:relative lg:top-auto lg:bottom-auto lg:z-auto lg:min-h-0 lg:translate-x-0 ${
-            sidebarCollapsed ? "w-[248px] px-4 lg:w-[72px] lg:px-2" : "w-[248px] px-4"
-          } ${mobileNavOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}
-        >
-          <nav className="flex flex-1 flex-col gap-1 pt-1">
-            {NAV.map(({ href, label, Icon }) => {
-              const active = pathname === href || (href !== "/dashboard" && pathname.startsWith(href));
-              const colorClass = active ? "" : "text-white/90";
-              const style = active ? { color: ACCENT } : undefined;
-              return (
-                <Link
-                  key={href}
-                  href={href}
-                  title={railMode ? label : undefined}
-                  className={`flex items-center rounded-lg py-2.5 text-sm font-medium transition-colors hover:bg-white/5 ${railMode ? "justify-center gap-0 px-2" : "gap-3 px-3"} ${active ? "bg-[#d4a853]/14 shadow-[inset_0_0_12px_rgba(212,168,83,0.12)]" : ""} ${colorClass}`}
-                  style={style}
-                >
-                  <Icon className="shrink-0" style={active ? { color: ACCENT } : { color: "rgba(255,255,255,0.9)" }} />
-                  <span className={railMode ? "sr-only" : ""}>{label}</span>
-                </Link>
-              );
-            })}
-          </nav>
-          <button
-            type="button"
-            title={railMode ? "Sign Out" : undefined}
-            className={`mt-auto flex items-center rounded-lg py-2.5 text-sm font-medium text-white/90 transition-colors hover:bg-white/5 ${railMode ? "justify-center px-2" : "gap-3 px-3 text-left"}`}
+        {!hideSidebar ? (
+          <aside
+            className={`fixed top-14 bottom-0 z-50 flex shrink-0 flex-col bg-black py-6 text-white transition-[width,transform,padding] duration-200 ease-out lg:relative lg:top-auto lg:bottom-auto lg:z-auto lg:min-h-0 lg:translate-x-0 ${
+              sidebarCollapsed ? "w-[248px] px-4 lg:w-[72px] lg:px-2" : "w-[248px] px-4"
+            } ${mobileNavOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}
           >
-            <IconSignOut className="shrink-0 text-white/90" />
-            <span className={railMode ? "sr-only" : ""}>Sign Out</span>
-          </button>
-        </aside>
+            <nav className="flex flex-1 flex-col gap-1 pt-1">
+              {NAV.map(({ href, label, Icon }) => {
+                const active = pathname === href || (href !== "/dashboard" && pathname.startsWith(href));
+                const colorClass = active ? "" : "text-white/90";
+                const style = active ? { color: ACCENT } : undefined;
+                return (
+                  <Link
+                    key={href}
+                    href={href}
+                    title={railMode ? label : undefined}
+                    className={`flex items-center rounded-lg py-2.5 text-sm font-medium transition-colors hover:bg-white/5 ${railMode ? "justify-center gap-0 px-2" : "gap-3 px-3"} ${active ? "bg-[#d4a853]/14 shadow-[inset_0_0_12px_rgba(212,168,83,0.12)]" : ""} ${colorClass}`}
+                    style={style}
+                  >
+                    <Icon className="shrink-0" style={active ? { color: ACCENT } : { color: "rgba(255,255,255,0.9)" }} />
+                    <span className={railMode ? "sr-only" : ""}>{label}</span>
+                  </Link>
+                );
+              })}
+            </nav>
+            <button
+              type="button"
+              title={railMode ? "Sign Out" : undefined}
+              onClick={logout}
+              className={`mt-auto flex items-center rounded-lg py-2.5 text-sm font-medium text-white/90 transition-colors hover:bg-white/5 ${railMode ? "justify-center px-2" : "gap-3 px-3 text-left"}`}
+            >
+              <IconSignOut className="shrink-0 text-white/90" />
+              <span className={railMode ? "sr-only" : ""}>Sign Out</span>
+            </button>
+          </aside>
+        ) : null}
         <main className={`min-h-0 min-w-0 flex-1 ${mainClassName ?? ""}`}>{children}</main>
       </div>
     </div>

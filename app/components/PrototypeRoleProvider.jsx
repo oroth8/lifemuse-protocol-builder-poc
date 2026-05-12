@@ -1,5 +1,6 @@
 "use client";
 
+import { usePathname, useRouter } from "next/navigation";
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 
 const STORAGE_KEY = "lifemuse_prototype_role";
@@ -15,7 +16,8 @@ function IconChevronDown({ className }) {
 
 export const PROTOTYPE_ROLES = [
   { id: "concierge", roleLabel: "Concierge", firstName: "Stephen" },
-  { id: "care_team", roleLabel: "Care Team Member", firstName: "Amy" },
+  { id: "care_team", roleLabel: "Care Team Member", firstName: "Ellie" },
+  { id: "designer", roleLabel: "The Designer", firstName: "NICO" },
 ];
 
 const defaultRole = PROTOTYPE_ROLES[0];
@@ -31,6 +33,8 @@ export function usePrototypeRole() {
 }
 
 function PrototypeRoleControls() {
+  const pathname = usePathname();
+  const router = useRouter();
   const { role, setRoleId, roles } = usePrototypeRole();
   const [expanded, setExpanded] = useState(true);
 
@@ -43,6 +47,10 @@ function PrototypeRoleControls() {
       /* ignore */
     }
   }, []);
+
+  if (pathname.startsWith("/auth")) {
+    return null;
+  }
 
   const toggleExpanded = () => {
     setExpanded((e) => {
@@ -58,7 +66,7 @@ function PrototypeRoleControls() {
 
   return (
     <div
-      className="fixed bottom-4 right-4 z-[100] w-[min(100vw-2rem,280px)] rounded-lg border border-gray-200 bg-white shadow-md"
+      className="fixed bottom-4 right-4 z-[100] w-[min(100vw-2rem,220px)] rounded-lg border border-gray-200 bg-white shadow-md"
       role="region"
       aria-label="Prototype controls"
     >
@@ -89,7 +97,12 @@ function PrototypeRoleControls() {
               <button
                 key={r.id}
                 type="button"
-                onClick={() => setRoleId(r.id)}
+                onClick={() => {
+                  setRoleId(r.id);
+                  if (r.id === "designer") {
+                    router.push("/design-system");
+                  }
+                }}
                 className={`flex w-full flex-col items-start rounded-lg border px-3 py-2 text-left text-sm transition-colors ${
                   selected
                     ? "border-[#2d2d2d]/40 bg-[#2d2d2d]/10 text-gray-900"
