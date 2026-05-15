@@ -105,7 +105,7 @@ const NAV = [
   { href: "/reminders", label: "Reminders", Icon: IconBell },
   { href: "/protocols", label: "Protocols", Icon: IconGrid },
   { href: "/members", label: "Members", Icon: IconUsers },
-  { href: "/messages", label: "Messages", Icon: IconMessage },
+  { href: "/messages", label: "Messages", Icon: IconMessage, badge: "Out of Scope" },
   { href: "/programs", label: "Programs", Icon: IconPrograms },
   { href: "/items", label: "Items", Icon: IconItems },
   { href: "/categories", label: "Categories", Icon: IconCategories },
@@ -175,7 +175,7 @@ export function AppShell({ children, mainClassName, hideSidebar = false, hideTop
             } ${mobileNavOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}
           >
             <nav className="flex flex-1 flex-col gap-1 pt-1">
-              {NAV.map(({ href, label, Icon }) => {
+              {NAV.map(({ href, label, Icon, badge }) => {
                 const active = pathname === href || (href !== "/dashboard" && pathname.startsWith(href));
                 const colorClass = active ? "" : "text-white/90";
                 const style = active ? { color: ACCENT } : undefined;
@@ -183,12 +183,17 @@ export function AppShell({ children, mainClassName, hideSidebar = false, hideTop
                   <Link
                     key={href}
                     href={href}
-                    title={railMode ? label : undefined}
-                    className={`flex items-center rounded-lg py-2.5 text-sm font-medium transition-colors hover:bg-white/5 ${railMode ? "justify-center gap-0 px-2" : "gap-3 px-3"} ${active ? "bg-[#d4a853]/14 shadow-[inset_0_0_12px_rgba(212,168,83,0.12)]" : ""} ${colorClass}`}
+                    title={railMode ? (badge ? `${label} (${badge})` : label) : undefined}
+                    className={`flex items-center rounded-lg py-2.5 text-sm font-medium transition-colors hover:bg-white/5 ${railMode ? "justify-center gap-0 px-2" : "min-w-0 gap-3 px-3"} ${active ? "bg-[#d4a853]/14 shadow-[inset_0_0_12px_rgba(212,168,83,0.12)]" : ""} ${colorClass}`}
                     style={style}
                   >
                     <Icon className="shrink-0" style={active ? { color: ACCENT } : { color: "rgba(255,255,255,0.9)" }} />
-                    <span className={railMode ? "sr-only" : ""}>{label}</span>
+                    <span className={`min-w-0 flex-1 truncate ${railMode ? "sr-only" : ""}`}>{label}</span>
+                    {badge && !railMode ? (
+                      <span className="shrink-0 rounded-full border border-white/20 bg-white/10 px-2 py-0.5 text-[10px] font-semibold uppercase leading-none tracking-wide text-white/85">
+                        {badge}
+                      </span>
+                    ) : null}
                   </Link>
                 );
               })}

@@ -2,10 +2,12 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { PILLAR_META, PILLAR_TAG_ORDER } from "../categories/categoriesData";
+import { CustomRecurrenceModal } from "../components/CustomRecurrenceModal";
 import { FieldLabel } from "../components/FieldLabel";
 import { DEFAULT_SUPPLEMENT_ICON_ID, SupplementIconGlyph, SupplementIconPickerModal } from "../components/protocolSupplementIcons";
+import { normalizeRecurrenceCustom, recurrenceSelectValue } from "../lib/customRecurrence";
 import {
   CONCIERGE_REMINDER_ORDER,
   EMPTY_ITEM_FORM_VALUES,
@@ -13,8 +15,14 @@ import {
   ITEM_TYPE_ORDER,
   RECURRENCE_META,
   RECURRENCE_ORDER,
+  RECOVERY_SESSION_CATEGORY_META,
+  RECOVERY_SESSION_CATEGORY_ORDER,
+  REGENERATION_SESSION_CATEGORY_META,
+  REGENERATION_SESSION_CATEGORY_ORDER,
   SESSION_TYPE_META,
   SESSION_TYPE_ORDER,
+  SUPPLEMENT_RECURRENCE_META,
+  SUPPLEMENT_RECURRENCE_ORDER,
 } from "./itemsData";
 
 const PENDING_KEY = "lm_items_pending";
@@ -53,6 +61,55 @@ function IconInfo({ className }) {
   );
 }
 
+/** Same chevron semantics as ProtocolBuilder `CollapseChevron` */
+function CollapseChevronSmall({ expanded }) {
+  return (
+    <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center text-gray-400" aria-hidden>
+      <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor" className="block" xmlns="http://www.w3.org/2000/svg">
+        {expanded ? (
+          <path
+            fillRule="evenodd"
+            d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"
+          />
+        ) : (
+          <path
+            fillRule="evenodd"
+            d="M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708z"
+          />
+        )}
+      </svg>
+    </span>
+  );
+}
+
+function ItemContextFieldsCollapsible({ children }) {
+  const [open, setOpen] = useState(true);
+  const uid = useId();
+  const panelId = `${uid}-item-ctx`;
+  const labelId = `${uid}-item-ctx-label`;
+  return (
+    <div className="rounded-xl border border-gray-200 bg-gray-50/60 p-4 sm:p-5">
+      <button
+        type="button"
+        id={labelId}
+        className="flex w-full cursor-pointer items-center justify-between gap-2 border-0 bg-transparent p-0 text-left"
+        style={{ font: "inherit" }}
+        aria-expanded={open}
+        aria-controls={panelId}
+        onClick={() => setOpen((o) => !o)}
+      >
+        <span className="text-[11px] font-bold uppercase tracking-[0.06em] text-[#5E6980]">Context fields</span>
+        <CollapseChevronSmall expanded={open} />
+      </button>
+      {open ? (
+        <div id={panelId} role="region" aria-labelledby={labelId} className="mt-4 space-y-4">
+          {children}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 /** One column in session/task schedule rows; on lg, controls share one baseline across the row */
 function ScheduleField({ id, label, infoTitle, children }) {
   return (
@@ -84,9 +141,21 @@ export function ItemFormClient({ mode, itemId, initialValues = {} }) {
   const router = useRouter();
   const [form, setForm] = useState(() => ({ ...EMPTY_ITEM_FORM_VALUES, ...initialValues }));
   const [iconPickerOpen, setIconPickerOpen] = useState(false);
+  const [supplementRecurrenceModalOpen, setSupplementRecurrenceModalOpen] = useState(false);
+  const supplementRecurrenceSnapshotRef = useRef(null);
 
   const pillarLabel = PILLAR_META[form.pillarKey]?.label ?? PILLAR_META.nutrition.label;
   const pillarHex = PILLAR_ACCENT_HEX[form.pillarKey] ?? PILLAR_ACCENT_HEX.nutrition;
+  const isSupplementsPillar = form.pillarKey === "supplements";
+  const isRecoveryPillar = form.pillarKey === "recovery";
+  const isRegenerationPillar = form.pillarKey === "regeneration";
+
+  useEffect(() => {
+    if (form.pillarKey !== "supplements") return;
+    if (form.itemTypeKey === "session" || form.itemTypeKey === "task") {
+      setForm((prev) => ({ ...prev, itemTypeKey: "system_formula" }));
+    }
+  }, [form.pillarKey, form.itemTypeKey]);
 
   const itemTypeSelectKeys = useMemo(() => {
     if (form.itemTypeKey === "session" || form.itemTypeKey === "task") return ["session", "task"];
@@ -97,12 +166,56 @@ export function ItemFormClient({ mode, itemId, initialValues = {} }) {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
+  function handleSupplementRecurrenceSelect(e) {
+    const v = e.target.value;
+    if (v === "custom") {
+      supplementRecurrenceSnapshotRef.current = {
+        supplementRecurrenceType: form.supplementRecurrenceType,
+        supplementRecurrenceCustom: form.supplementRecurrenceCustom,
+      };
+      setForm((prev) => ({ ...prev, supplementRecurrenceType: "custom" }));
+      setSupplementRecurrenceModalOpen(true);
+    } else {
+      setForm((prev) => ({
+        ...prev,
+        supplementRecurrenceType: v,
+        supplementRecurrenceCustom: null,
+      }));
+    }
+  }
+
+  function handleSupplementCustomDone(custom) {
+    setForm((prev) => ({ ...prev, supplementRecurrenceCustom: custom }));
+    setSupplementRecurrenceModalOpen(false);
+    supplementRecurrenceSnapshotRef.current = null;
+  }
+
+  function handleSupplementCustomCancel() {
+    setSupplementRecurrenceModalOpen(false);
+    const snap = supplementRecurrenceSnapshotRef.current;
+    if (snap) {
+      setForm((prev) => ({
+        ...prev,
+        supplementRecurrenceType: snap.supplementRecurrenceType,
+        supplementRecurrenceCustom: snap.supplementRecurrenceCustom,
+      }));
+      supplementRecurrenceSnapshotRef.current = null;
+    }
+  }
+
   function saveDraft() {
     router.push("/items");
   }
 
   function saveItem() {
-    const safeType = ITEM_TYPE_META[form.itemTypeKey] ? form.itemTypeKey : "task";
+    const isSup = form.pillarKey === "supplements";
+    const safeType = isSup
+      ? form.itemTypeKey === "compound" || form.itemTypeKey === "system_formula"
+        ? form.itemTypeKey
+        : "system_formula"
+      : ITEM_TYPE_META[form.itemTypeKey]
+        ? form.itemTypeKey
+        : "task";
     const itemName = form.itemName.trim() || "Untitled item";
     const row = {
       id: mode === "create" ? Date.now() : itemId,
@@ -122,6 +235,25 @@ export function ItemFormClient({ mode, itemId, initialValues = {} }) {
       icon_id: form.icon_id || DEFAULT_SUPPLEMENT_ICON_ID,
     };
 
+    if (form.pillarKey === "recovery") {
+      row.recovery_session_category = form.recoverySessionCategory;
+    }
+    if (form.pillarKey === "regeneration") {
+      row.regeneration_session_category = form.regenerationSessionCategory;
+    }
+
+    if (isSup) {
+      row.dosage = typeof form.dosage === "string" ? form.dosage : "";
+      row.route = typeof form.route === "string" ? form.route : "";
+      row.recurrence_type = form.supplementRecurrenceType;
+      row.start_date = form.supplementStartDate;
+      row.end_date = form.supplementEndDate;
+      row.anchor_time = form.supplementAnchorTime;
+      if (form.supplementRecurrenceType === "custom") {
+        row.recurrence_custom = normalizeRecurrenceCustom(form.supplementRecurrenceCustom);
+      }
+    }
+
     const payload = mode === "create" ? { op: "create", row } : { op: "update", row };
     try {
       sessionStorage.setItem(PENDING_KEY, JSON.stringify(payload));
@@ -135,6 +267,8 @@ export function ItemFormClient({ mode, itemId, initialValues = {} }) {
 
   const isSession = form.itemTypeKey === "session";
   const isTask = form.itemTypeKey === "task";
+  const showSessionTaskChrome = (isSession || isTask) && !isSupplementsPillar;
+  const showLegacyTypePillar = !isSession && !isTask && !isSupplementsPillar;
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
@@ -149,9 +283,18 @@ export function ItemFormClient({ mode, itemId, initialValues = {} }) {
           </Link>
           <div className="min-w-0">
             <h1 className="text-[15px] font-semibold tracking-tight text-[#1B2230]">{title}</h1>
-            <p className="mt-0.5 text-xs font-medium" style={{ color: pillarHex }}>
-              {pillarLabel}
-            </p>
+            {mode === "create" ? (
+              <p className="mt-0.5 text-xs leading-snug">
+                <span className="font-medium text-[#5E6980]">Pillar — </span>
+                <span className="font-semibold" style={{ color: pillarHex }}>
+                  {pillarLabel}
+                </span>
+              </p>
+            ) : (
+              <p className="mt-0.5 text-xs font-medium" style={{ color: pillarHex }}>
+                {pillarLabel}
+              </p>
+            )}
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-2">
@@ -202,13 +345,91 @@ export function ItemFormClient({ mode, itemId, initialValues = {} }) {
                   value={form.itemName}
                   onChange={(e) => setField("itemName", e.target.value)}
                   className={`${controlClass} mt-0`}
-                  placeholder="e.g. Drink Water"
+                  placeholder={isSupplementsPillar ? "Supplement name" : "e.g. Drink Water"}
                   aria-label="Item name"
                 />
               </div>
             </div>
 
-            {(isSession || isTask) ? (
+            {isSupplementsPillar ? (
+              <>
+                <div className="grid gap-5 sm:grid-cols-2">
+                  <div>
+                    <FieldLabel htmlFor="dosage" className="font-bold uppercase">
+                      Dosage
+                    </FieldLabel>
+                    <input
+                      id="dosage"
+                      type="text"
+                      value={form.dosage}
+                      onChange={(e) => setField("dosage", e.target.value)}
+                      className={`${controlClass} mt-1.5`}
+                      placeholder="e.g. 1 scoop"
+                      autoComplete="off"
+                    />
+                  </div>
+                  <div>
+                    <FieldLabel htmlFor="route" className="font-bold uppercase">
+                      Route
+                    </FieldLabel>
+                    <input
+                      id="route"
+                      type="text"
+                      value={form.route}
+                      onChange={(e) => setField("route", e.target.value)}
+                      className={`${controlClass} mt-1.5`}
+                      placeholder="e.g. oral"
+                      autoComplete="off"
+                    />
+                  </div>
+                </div>
+                <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4 lg:items-stretch *:min-h-0">
+                  <ScheduleField id="supp-recurrence" label="Recurrence">
+                    <select
+                      id="supp-recurrence"
+                      value={recurrenceSelectValue(form.supplementRecurrenceType)}
+                      onChange={handleSupplementRecurrenceSelect}
+                      className={compactControlClass}
+                    >
+                      {SUPPLEMENT_RECURRENCE_ORDER.map((key) => (
+                        <option key={key} value={key}>
+                          {SUPPLEMENT_RECURRENCE_META[key].label}
+                        </option>
+                      ))}
+                    </select>
+                  </ScheduleField>
+                  <ScheduleField id="supp-start-date" label="Starting at">
+                    <input
+                      id="supp-start-date"
+                      type="date"
+                      value={form.supplementStartDate}
+                      onChange={(e) => setField("supplementStartDate", e.target.value)}
+                      className={compactControlClass}
+                    />
+                  </ScheduleField>
+                  <ScheduleField id="supp-end-date" label="Ending on">
+                    <input
+                      id="supp-end-date"
+                      type="date"
+                      value={form.supplementEndDate}
+                      onChange={(e) => setField("supplementEndDate", e.target.value)}
+                      className={compactControlClass}
+                    />
+                  </ScheduleField>
+                  <ScheduleField id="supp-anchor-time" label="Time">
+                    <input
+                      id="supp-anchor-time"
+                      type="time"
+                      value={form.supplementAnchorTime}
+                      onChange={(e) => setField("supplementAnchorTime", e.target.value)}
+                      className={compactControlClass}
+                    />
+                  </ScheduleField>
+                </div>
+              </>
+            ) : null}
+
+            {showSessionTaskChrome ? (
               <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
                 <div>
                   <FieldLabel htmlFor="item-type-main" className="font-bold uppercase">
@@ -232,19 +453,47 @@ export function ItemFormClient({ mode, itemId, initialValues = {} }) {
                     <FieldLabel htmlFor="session-type" className="font-bold uppercase">
                       Session type
                     </FieldLabel>
-                    <select id="session-type" value={form.sessionTypeKey} onChange={(e) => setField("sessionTypeKey", e.target.value)} className={`${controlClass} mt-1.5`}>
-                      {SESSION_TYPE_ORDER.map((key) => (
-                        <option key={key} value={key}>
-                          {SESSION_TYPE_META[key].label}
-                        </option>
-                      ))}
-                    </select>
+                    {isRecoveryPillar ? (
+                      <select
+                        id="session-type"
+                        value={form.recoverySessionCategory}
+                        onChange={(e) => setField("recoverySessionCategory", e.target.value)}
+                        className={`${controlClass} mt-1.5`}
+                      >
+                        {RECOVERY_SESSION_CATEGORY_ORDER.map((key) => (
+                          <option key={key} value={key}>
+                            {RECOVERY_SESSION_CATEGORY_META[key].label}
+                          </option>
+                        ))}
+                      </select>
+                    ) : isRegenerationPillar ? (
+                      <select
+                        id="session-type"
+                        value={form.regenerationSessionCategory}
+                        onChange={(e) => setField("regenerationSessionCategory", e.target.value)}
+                        className={`${controlClass} mt-1.5`}
+                      >
+                        {REGENERATION_SESSION_CATEGORY_ORDER.map((key) => (
+                          <option key={key} value={key}>
+                            {REGENERATION_SESSION_CATEGORY_META[key].label}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <select id="session-type" value={form.sessionTypeKey} onChange={(e) => setField("sessionTypeKey", e.target.value)} className={`${controlClass} mt-1.5`}>
+                        {SESSION_TYPE_ORDER.map((key) => (
+                          <option key={key} value={key}>
+                            {SESSION_TYPE_META[key].label}
+                          </option>
+                        ))}
+                      </select>
+                    )}
                   </div>
                 ) : null}
               </div>
             ) : null}
 
-            {isSession ? (
+            {isSession && showSessionTaskChrome ? (
               <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4 lg:items-stretch *:min-h-0">
                 <ScheduleField id="recurrence-s" label="Recurrence">
                   <select id="recurrence-s" value={form.recurrence} onChange={(e) => setField("recurrence", e.target.value)} className={compactControlClass}>
@@ -273,7 +522,7 @@ export function ItemFormClient({ mode, itemId, initialValues = {} }) {
               </div>
             ) : null}
 
-            {isTask ? (
+            {isTask && showSessionTaskChrome ? (
               <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4 lg:items-stretch *:min-h-0">
                 <ScheduleField id="recurrence-t" label="Recurrence">
                   <select id="recurrence-t" value={form.recurrence} onChange={(e) => setField("recurrence", e.target.value)} className={compactControlClass}>
@@ -296,7 +545,7 @@ export function ItemFormClient({ mode, itemId, initialValues = {} }) {
               </div>
             ) : null}
 
-            {!isSession && !isTask ? (
+            {showLegacyTypePillar ? (
               <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
                 <div>
                   <FieldLabel htmlFor="item-type-legacy" className="font-bold uppercase">
@@ -339,54 +588,58 @@ export function ItemFormClient({ mode, itemId, initialValues = {} }) {
               />
             </div>
 
-            <div className="rounded-xl border border-gray-200 bg-gray-50/60 p-4 sm:p-5">
-              <p className="text-[11px] font-bold uppercase tracking-[0.06em] text-[#5E6980]">Context fields</p>
-              <div className="mt-4 space-y-4">
-                <div>
-                  <FieldLabel htmlFor="ctx-what" className="font-bold uppercase">
-                    The what
-                  </FieldLabel>
-                  <textarea
-                    id="ctx-what"
-                    rows={3}
-                    value={form.contextWhat}
-                    onChange={(e) => setField("contextWhat", e.target.value)}
-                    placeholder="What is this item? Describe it clearly and concisely."
-                    className={`${controlClass} mt-1.5 resize-y`}
-                  />
-                </div>
-                <div>
-                  <FieldLabel htmlFor="ctx-exp" className="font-bold uppercase">
-                    The expectations
-                  </FieldLabel>
-                  <textarea
-                    id="ctx-exp"
-                    rows={3}
-                    value={form.contextExpectations}
-                    onChange={(e) => setField("contextExpectations", e.target.value)}
-                    placeholder="What outcomes or results should the patient expect from this?"
-                    className={`${controlClass} mt-1.5 resize-y`}
-                  />
-                </div>
-                <div>
-                  <FieldLabel htmlFor="ctx-why" className="font-bold uppercase">
-                    The why
-                  </FieldLabel>
-                  <textarea
-                    id="ctx-why"
-                    rows={3}
-                    value={form.contextWhy}
-                    onChange={(e) => setField("contextWhy", e.target.value)}
-                    placeholder="Why is this included in the protocol? What's the clinical rationale?"
-                    className={`${controlClass} mt-1.5 resize-y`}
-                  />
-                </div>
+            <ItemContextFieldsCollapsible>
+              <div>
+                <FieldLabel htmlFor="ctx-what" className="font-bold uppercase">
+                  The what
+                </FieldLabel>
+                <textarea
+                  id="ctx-what"
+                  rows={3}
+                  value={form.contextWhat}
+                  onChange={(e) => setField("contextWhat", e.target.value)}
+                  placeholder="What is this item? Describe it clearly and concisely."
+                  className={`${controlClass} mt-1.5 resize-y`}
+                />
               </div>
-            </div>
+              <div>
+                <FieldLabel htmlFor="ctx-exp" className="font-bold uppercase">
+                  The expectations
+                </FieldLabel>
+                <textarea
+                  id="ctx-exp"
+                  rows={3}
+                  value={form.contextExpectations}
+                  onChange={(e) => setField("contextExpectations", e.target.value)}
+                  placeholder="What outcomes or results should the patient expect from this?"
+                  className={`${controlClass} mt-1.5 resize-y`}
+                />
+              </div>
+              <div>
+                <FieldLabel htmlFor="ctx-why" className="font-bold uppercase">
+                  The why
+                </FieldLabel>
+                <textarea
+                  id="ctx-why"
+                  rows={3}
+                  value={form.contextWhy}
+                  onChange={(e) => setField("contextWhy", e.target.value)}
+                  placeholder="Why is this included in the protocol? What's the clinical rationale?"
+                  className={`${controlClass} mt-1.5 resize-y`}
+                />
+              </div>
+            </ItemContextFieldsCollapsible>
           </div>
         </section>
         </div>
       </div>
+      {isSupplementsPillar && supplementRecurrenceModalOpen ? (
+        <CustomRecurrenceModal
+          initial={form.supplementRecurrenceCustom}
+          onDone={handleSupplementCustomDone}
+          onCancel={handleSupplementCustomCancel}
+        />
+      ) : null}
     </div>
   );
 }

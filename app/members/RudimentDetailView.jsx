@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { AppShell } from "../components/AppShell";
+import { PageBreadcrumb } from "../components/PageBreadcrumb";
+
 function BackTitle({ href, children }) {
   return (
     <Link href={href} className="group inline-flex items-center gap-3 text-gray-900">
@@ -57,43 +59,15 @@ export function RudimentDetailView({ member, rudiment }) {
     <AppShell mainClassName="flex min-h-screen min-w-0 flex-1 flex-col bg-[#f4f4f4] text-gray-900">
       <div className="flex-1 overflow-auto p-6 lg:p-8">
         <div className="mx-auto max-w-6xl space-y-6">
-          <nav className="text-sm" aria-label="Breadcrumb">
-            <ol className="flex flex-wrap items-center gap-2">
-              <li>
-                <Link href="/dashboard" className="text-blue-600 hover:text-blue-700 hover:underline">
-                  Home
-                </Link>
-              </li>
-              <li className="text-gray-400" aria-hidden>
-                &gt;
-              </li>
-              <li>
-                <Link href="/members" className="text-blue-600 hover:text-blue-700 hover:underline">
-                  Members
-                </Link>
-              </li>
-              <li className="text-gray-400" aria-hidden>
-                &gt;
-              </li>
-              <li>
-                <Link href={`/members/${member.id}`} className="text-blue-600 hover:text-blue-700 hover:underline">
-                  {member.fullName}
-                </Link>
-              </li>
-              <li className="text-gray-400" aria-hidden>
-                &gt;
-              </li>
-              <li>
-                <Link href={manageHref} className="text-blue-600 hover:text-blue-700 hover:underline">
-                  Manage Rudiments
-                </Link>
-              </li>
-              <li className="text-gray-400" aria-hidden>
-                &gt;
-              </li>
-              <li className="font-medium text-gray-600">Rudiment #{rudiment.id}</li>
-            </ol>
-          </nav>
+          <PageBreadcrumb
+            crumbs={[
+              { label: "Home", href: "/dashboard" },
+              { label: "Members", href: "/members" },
+              { label: member.fullName, href: `/members/${member.id}` },
+              { label: "Manage Rudiments", href: manageHref },
+              { label: `Rudiment #${rudiment.id}` },
+            ]}
+          />
 
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <BackTitle href={manageHref}>Rudiment #{rudiment.id}</BackTitle>

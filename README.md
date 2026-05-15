@@ -20,6 +20,15 @@ Run these commands from **this project folder** (the one that contains `package.
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
+## Local disk cleanup
+
+Build output and dependencies are gitignored but can grow large on disk. From this project root, with the dev server stopped:
+
+```bash
+rm -rf .next
+rm -rf node_modules && npm ci
+```
+
 You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.

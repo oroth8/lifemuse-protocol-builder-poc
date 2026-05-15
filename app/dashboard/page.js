@@ -1,13 +1,15 @@
 import { AppShell } from "../components/AppShell";
+import { PageBreadcrumb } from "../components/PageBreadcrumb";
 import { DashboardWelcomeHeading } from "./DashboardWelcomeHeading";
 import { NeedsAttentionSection } from "./NeedsAttentionSection";
 import { ReminderNotificationsTable } from "./ReminderNotificationsTable";
 
+/** `reminderId` is the sent-reminder record id (see `remindersData`) for deep links from the dashboard. */
 const REMINDERS = [
-  { id: "R-1042", date: "Apr 26, 2026", from: "Care Team", title: "Lab results ready", description: "Your latest panel is available to review." },
-  { id: "R-1041", date: "Apr 24, 2026", from: "Dr. Chen", title: "Follow-up scheduled", description: "Telehealth visit confirmed for next week." },
-  { id: "R-1038", date: "Apr 22, 2026", from: "System", title: "Protocol updated", description: "Supplement timing was adjusted per clinician." },
-  { id: "R-1035", date: "Apr 18, 2026", from: "Care Team", title: "Check-in reminder", description: "Please complete your weekly symptom log." },
+  { id: "R-1042", reminderId: "55448", date: "Apr 26, 2026", from: "Care Team", importance: "High", title: "Lab results ready", description: "Your latest panel is available to review." },
+  { id: "R-1041", reminderId: "55451", date: "Apr 24, 2026", from: "Dr. Chen", importance: "Medium", title: "Follow-up scheduled", description: "Telehealth visit confirmed for next week." },
+  { id: "R-1038", reminderId: "55450", date: "Apr 22, 2026", from: "System", importance: "Low", title: "Protocol updated", description: "Supplement timing was adjusted per clinician." },
+  { id: "R-1035", reminderId: "55449", date: "Apr 18, 2026", from: "Care Team", importance: "Medium", title: "Check-in reminder", description: "Please complete your weekly symptom log." },
 ];
 
 const NEEDS_ATTENTION = [
@@ -21,6 +23,8 @@ export default function DashboardPage() {
     <AppShell mainClassName="flex min-h-screen min-w-0 flex-1 flex-col bg-[#f4f4f4]">
       <div className="flex-1 overflow-auto p-6 lg:p-8">
         <div className="mx-auto max-w-6xl space-y-8">
+          <PageBreadcrumb crumbs={[{ label: "Home" }]} />
+
           <div>
             <DashboardWelcomeHeading />
             <p className="mt-2 max-w-2xl text-sm text-gray-600 sm:text-base">

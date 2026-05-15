@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { AppShell } from "../components/AppShell";
+import { PageBreadcrumb } from "../components/PageBreadcrumb";
 
 function BackTitle({ href, children }) {
   return (
@@ -54,43 +55,15 @@ export function ProgressNoteDetailView({ member, note }) {
     <AppShell mainClassName="flex min-h-screen min-w-0 flex-1 flex-col bg-[#f4f4f4] text-gray-900">
       <div className="flex-1 overflow-auto p-6 lg:p-8">
         <div className="mx-auto max-w-6xl space-y-6">
-          <nav className="text-sm" aria-label="Breadcrumb">
-            <ol className="flex flex-wrap items-center gap-2">
-              <li>
-                <Link href="/dashboard" className="text-blue-600 hover:text-blue-700 hover:underline">
-                  Home
-                </Link>
-              </li>
-              <li className="text-gray-400" aria-hidden>
-                &gt;
-              </li>
-              <li>
-                <Link href="/members" className="text-blue-600 hover:text-blue-700 hover:underline">
-                  Members
-                </Link>
-              </li>
-              <li className="text-gray-400" aria-hidden>
-                &gt;
-              </li>
-              <li>
-                <Link href={`/members/${member.id}`} className="text-blue-600 hover:text-blue-700 hover:underline">
-                  {member.fullName}
-                </Link>
-              </li>
-              <li className="text-gray-400" aria-hidden>
-                &gt;
-              </li>
-              <li>
-                <Link href={manageHref} className="text-blue-600 hover:text-blue-700 hover:underline">
-                  Manage Progress Notes
-                </Link>
-              </li>
-              <li className="text-gray-400" aria-hidden>
-                &gt;
-              </li>
-              <li className="font-medium text-gray-600">Progress Note #{note.id}</li>
-            </ol>
-          </nav>
+          <PageBreadcrumb
+            crumbs={[
+              { label: "Home", href: "/dashboard" },
+              { label: "Members", href: "/members" },
+              { label: member.fullName, href: `/members/${member.id}` },
+              { label: "Manage Progress Notes", href: manageHref },
+              { label: `Progress Note #${note.id}` },
+            ]}
+          />
 
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <BackTitle href={manageHref}>Progress Note #{note.id}</BackTitle>

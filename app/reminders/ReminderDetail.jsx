@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { FieldLabel } from "../components/FieldLabel";
+import { ReminderImportanceBadge } from "./ReminderImportanceBadge";
 
 function IconTrash() {
   return (
@@ -22,6 +23,10 @@ export function ReminderDetail({ reminder }) {
     { label: "ID", value: reminder.id },
     { label: "DATE", value: reminder.displayDate },
     { label: "ASSIGN TO", value: reminder.to },
+    {
+      label: "IMPORTANCE",
+      value: <ReminderImportanceBadge level={reminder.importance} />,
+    },
     { label: "TITLE", value: reminder.title },
     { label: "DESCRIPTION", value: reminder.description },
   ];

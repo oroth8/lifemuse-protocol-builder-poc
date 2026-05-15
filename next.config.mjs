@@ -1,6 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  /* config options here */
+  /** Hide the floating Next.js dev indicator in development (`<nextjs-portal>` host may still exist for error overlay). */
+  devIndicators: false,
 };
 
 export default nextConfig;

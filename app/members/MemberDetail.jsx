@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { AppShell } from "../components/AppShell";
+import { PageBreadcrumb } from "../components/PageBreadcrumb";
 import { SortableTh } from "../components/SortableTh";
 import { useTableSort } from "../hooks/useTableSort";
 import { parseDateish, sortRows } from "../lib/tableSort";
@@ -301,27 +302,13 @@ export function MemberDetail({ member }) {
     <AppShell mainClassName="flex min-h-screen min-w-0 flex-1 flex-col bg-[#f4f4f4]">
       <div className="flex-1 overflow-auto p-6 lg:p-8">
         <div className="mx-auto max-w-6xl">
-          <nav className="text-sm" aria-label="Breadcrumb">
-            <ol className="flex flex-wrap items-center gap-2">
-              <li>
-                <Link href="/dashboard" className="text-blue-600 hover:text-blue-700 hover:underline">
-                  Home
-                </Link>
-              </li>
-              <li className="text-gray-400" aria-hidden>
-                &gt;
-              </li>
-              <li>
-                <Link href="/members" className="text-blue-600 hover:text-blue-700 hover:underline">
-                  Members
-                </Link>
-              </li>
-              <li className="text-gray-400" aria-hidden>
-                &gt;
-              </li>
-              <li className="font-medium text-gray-600">{displayName}</li>
-            </ol>
-          </nav>
+          <PageBreadcrumb
+            crumbs={[
+              { label: "Home", href: "/dashboard" },
+              { label: "Members", href: "/members" },
+              { label: displayName },
+            ]}
+          />
 
           <div className="mt-5 flex flex-col gap-4 sm:mt-6 sm:flex-row sm:items-center sm:justify-between">
             <h1 className="text-3xl font-bold tracking-tight text-gray-900">{displayName}</h1>

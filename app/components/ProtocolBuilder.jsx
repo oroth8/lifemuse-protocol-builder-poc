@@ -2,9 +2,11 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { addUserProtocol } from "../lib/userProtocols";
+import { recurrenceSelectValue } from "../lib/customRecurrence";
 import { createPortal } from "react-dom";
+import { CustomRecurrenceModal } from "./CustomRecurrenceModal";
 import { DEFAULT_SUPPLEMENT_ICON_ID, SupplementIconGlyph, SupplementIconPickerModal } from "./protocolSupplementIcons";
 
 const PILLARS = {
@@ -23,13 +25,6 @@ const RECURRENCE_LABELS = {
   custom: "Custom",
 };
 
-/** Normalize stored recurrence to one of the three dropdown values (legacy keys → custom / single_occurrence / daily). */
-function recurrenceSelectValue(stored) {
-  const r = stored || "daily";
-  if (r === "daily") return "daily";
-  if (r === "single_occurrence" || r === "one_time") return "single_occurrence";
-  return "custom";
-}
 const RECOVERY_ITEM_TYPES = [
   { value: "session", label: "Session" },
   { value: "task", label: "Task" },
@@ -97,7 +92,7 @@ const SUPPLEMENT_CATEGORIES = [
   { value: "peptide", label: "Peptides" },
 ];
 
-/** Regeneration pillar only — service catalogue filters on Items tab (not clinical pillar names) */
+/** Regeneration pillar only — service catalog filters on Items tab (not clinical pillar names) */
 const SERVICE_CATALOG_CATEGORIES = [
   { value: "massages", label: "Massages" },
   { value: "non_invasive", label: "Non-invasive Treatments" },
@@ -105,14 +100,14 @@ const SERVICE_CATALOG_CATEGORIES = [
   { value: "other", label: "Others" },
 ];
 
-/** Fallback when opening services catalogue without a pillar-specific filter */
+/** Fallback when opening services catalog without a pillar-specific filter */
 const SERVICE_PILLAR_CATALOG_FILTERS = [
   { value: "diagnostics", label: PILLARS.diagnostics.label },
   { value: "regeneration", label: PILLARS.regeneration.label },
   { value: "recovery", label: PILLARS.recovery.label },
 ];
 
-/** Diagnostics pillar — Items tab filters (`diagnostic_catalog_category` on catalogue rows) */
+/** Diagnostics pillar — Items tab filters (`diagnostic_catalog_category` on catalog rows) */
 const SERVICE_DIAGNOSTICS_CATALOG_FILTERS = [
   { value: "laboratory", label: "Laboratory" },
   { value: "imaging", label: "Imaging" },
@@ -149,7 +144,7 @@ function diagnosticsCatalogChipLabel(dc) {
   return SERVICE_DIAGNOSTICS_CATALOG_FILTERS.find((c) => c.value === dc)?.label || dc;
 }
 
-/** Recovery catalogue row — duration line like "≈ 15 mins" / "≈ 1 hour" */
+/** Recovery catalog row — duration line like "≈ 15 mins" / "≈ 1 hour" */
 function recoveryCatalogDurationLabel(minutes) {
   if (minutes === undefined || minutes === null) return null;
   const n = Number(minutes);
@@ -254,7 +249,7 @@ const MOCK_CATALOG = {
   ],
 };
 
-/** Bundled catalogue entries (programs) — each expands to multiple standalone items when added */
+/** Bundled catalog entries (programs) — each expands to multiple standalone items when added */
 const CATALOG_PROGRAMS = {
   supplements: [
     { id: "prog-sup-a", name: "Anti-inflammatory stack", category: "compound", description: "Curcumin, omega-3, vitamin C", item_ids: ["ci-061", "ci-060", "ci-064"] },
@@ -506,124 +501,6 @@ function ModalCloseButton({ onClose }) {
   );
 }
 
-const CUSTOM_RECURRENCE_UNITS = [
-  { value: "day", label: "Day" },
-  { value: "week", label: "Week" },
-  { value: "month", label: "Month" },
-];
-
-/** M T W T F S S — values are JavaScript weekday numbers (Sun = 0 … Sat = 6). */
-const CUSTOM_WEEKDAY_PICKER = [
-  { letter: "M", day: 1 },
-  { letter: "T", day: 2 },
-  { letter: "W", day: 3 },
-  { letter: "T", day: 4 },
-  { letter: "F", day: 5 },
-  { letter: "S", day: 6 },
-  { letter: "S", day: 0 },
-];
-
-function defaultRecurrenceCustom() {
-  return { repeat_every: 1, repeat_unit: "week", repeat_on: [2, 4] };
-}
-
-function normalizeRecurrenceCustom(initial) {
-  if (!initial || typeof initial !== "object") return defaultRecurrenceCustom();
-  const every = Math.max(1, Number(initial.repeat_every) || 1);
-  const unit = CUSTOM_RECURRENCE_UNITS.some((u) => u.value === initial.repeat_unit) ? initial.repeat_unit : "week";
-  const rawDays = Array.isArray(initial.repeat_on) ? initial.repeat_on : defaultRecurrenceCustom().repeat_on;
-  const on = [...new Set(rawDays.map(Number).filter((d) => d >= 0 && d <= 6))].sort((a, b) => a - b);
-  return { repeat_every: every, repeat_unit: unit, repeat_on: on };
-}
-
-function CustomRecurrenceModal({ initial, onDone, onCancel }) {
-  const base = normalizeRecurrenceCustom(initial);
-  const [every, setEvery] = useState(base.repeat_every);
-  const [unit, setUnit] = useState(base.repeat_unit);
-  const [onDays, setOnDays] = useState(() => [...base.repeat_on]);
-
-  const toggleDay = (d) => {
-    setOnDays((prev) => (prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d].sort((a, b) => a - b)));
-  };
-
-  const dayBtn = (active) => ({
-    width: 36,
-    height: 36,
-    borderRadius: "50%",
-    border: `1px solid ${active ? V.acc : V.bdr}`,
-    background: active ? V.acc : V.bgCard,
-    color: active ? "#fff" : V.tx,
-    fontSize: 12,
-    fontWeight: 600,
-    cursor: "pointer",
-    fontFamily: F,
-    padding: 0,
-    flexShrink: 0,
-  });
-
-  return (
-    <div style={S.modal} onClick={onCancel} role="presentation">
-      <div style={{ ...S.modalC, maxWidth: 420 }} onClick={(e) => e.stopPropagation()} role="dialog" aria-labelledby="custom-recurrence-title">
-        <div style={{ ...S.modalH, borderBottom: "none", paddingBottom: 0 }}>
-          <span id="custom-recurrence-title" style={{ ...S.lbl, fontSize: 13, letterSpacing: "0.08em" }}>
-            Custom…
-          </span>
-          <ModalCloseButton onClose={onCancel} />
-        </div>
-        <div style={{ ...S.modalB, paddingTop: 12 }}>
-          <div style={{ marginBottom: 18 }}>
-            <label style={{ ...S.lbl, display: "block", marginBottom: 8 }}>Repeat every</label>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-              <input
-                style={{ ...S.inp, width: 72 }}
-                type="number"
-                min={1}
-                step={1}
-                value={every}
-                onChange={(e) => setEvery(Math.max(1, Number(e.target.value) || 1))}
-              />
-              <select style={{ ...S.sel, flex: 1, minWidth: 120 }} value={unit} onChange={(e) => setUnit(e.target.value)}>
-                {CUSTOM_RECURRENCE_UNITS.map((u) => (
-                  <option key={u.value} value={u.value}>{u.label}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-          {unit !== "day" && (
-            <div style={{ marginBottom: 22 }}>
-              <span style={{ ...S.lbl, display: "block", marginBottom: 10 }}>Repeat on</span>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                {CUSTOM_WEEKDAY_PICKER.map(({ letter, day }) => (
-                  <button key={`${letter}-${day}`} type="button" style={dayBtn(onDays.includes(day))} onClick={() => toggleDay(day)} aria-pressed={onDays.includes(day)}>
-                    {letter}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-          <div style={{ display: "flex", gap: 12, justifyContent: "flex-end", marginTop: 8 }}>
-            <button type="button" style={S.btnS} onClick={onCancel}>
-              Cancel
-            </button>
-            <button
-              type="button"
-              style={S.btnP}
-              onClick={() =>
-                onDone({
-                  repeat_every: every,
-                  repeat_unit: unit,
-                  repeat_on: unit === "day" ? [] : [...onDays],
-                })}
-            >
-              Done
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 /** Recurrence dropdown; choosing Custom opens configuration modal. */
 function RecurrenceSelect({ item, onItemChange, recurrenceFallback = "daily", selectStyle }) {
   const [customOpen, setCustomOpen] = useState(false);
@@ -850,6 +727,47 @@ function CollapseChevron({ expanded }) {
   );
 }
 
+/** Collapsible “Context fields” (what / expectations / why) — shared by supplement, recovery, nutrition, and training item cards */
+function ContextFieldsCollapsible({ boxStyle, children }) {
+  const [open, setOpen] = useState(true);
+  const baseId = useId();
+  const regionId = `${baseId}-ctx`;
+  const labelId = `${baseId}-ctx-label`;
+  return (
+    <div style={boxStyle}>
+      <button
+        type="button"
+        id={labelId}
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        aria-controls={regionId}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          width: "100%",
+          gap: 10,
+          margin: 0,
+          padding: 0,
+          border: "none",
+          background: "none",
+          cursor: "pointer",
+          font: "inherit",
+          textAlign: "left",
+        }}
+      >
+        <span style={S.lbl}>Context fields</span>
+        <CollapseChevron expanded={open} />
+      </button>
+      {open ? (
+        <div id={regionId} role="region" aria-labelledby={labelId} style={{ marginTop: 16 }}>
+          {children}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function CatalogModal({ type, onSelect, onSelectProgram, onClose, pillarFilter }) {
   const [search, setSearch] = useState("");
   const [catF, setCatF] = useState("all");
@@ -963,7 +881,7 @@ function CatalogModal({ type, onSelect, onSelectProgram, onClose, pillarFilter }
         <div style={S.modalH}>
           <span style={{ fontSize: 15, fontWeight: 600 }}>
             {type === "supplements"
-              ? "Add from supplement catalogue"
+              ? "Add from supplement catalog"
               : type === "exercises"
                 ? "Add exercise"
                 : pillarFilter === "regeneration" || pillarFilter === "diagnostics" || pillarFilter === "recovery"
@@ -973,7 +891,7 @@ function CatalogModal({ type, onSelect, onSelectProgram, onClose, pillarFilter }
           <ModalCloseButton onClose={onClose} />
         </div>
         <div style={S.modalB}>
-          <input style={S.srch} placeholder="Search catalogue..." value={search} onChange={(e) => setSearch(e.target.value)} autoFocus />
+          <input style={S.srch} placeholder="Search catalog..." value={search} onChange={(e) => setSearch(e.target.value)} autoFocus />
           <div style={segShell} role="tablist" aria-label="Catalog view">
             <button type="button" role="tab" aria-selected={listMode === "items"} style={segBtn(listMode === "items")} onClick={() => setListMode("items")}>
               Items
@@ -1112,7 +1030,7 @@ function TrainingCatalogModal({ onClose, onSelectItem, onSelectProgram }) {
         </div>
         <div style={S.modalB}>
           <input style={S.srch} placeholder="Search Items or programs" value={search} onChange={(e) => setSearch(e.target.value)} autoFocus />
-          <div style={segShell} role="tablist" aria-label="Training catalogue">
+          <div style={segShell} role="tablist" aria-label="Training catalog">
             <button type="button" role="tab" aria-selected={listMode === "items"} style={segBtn(listMode === "items")} onClick={() => setListMode("items")}>
               Items
             </button>
@@ -1212,7 +1130,7 @@ function TrainingCatalogModal({ onClose, onSelectItem, onSelectProgram }) {
   );
 }
 
-/** Nutrition pillar — Items / Programs catalogue (mock items + programs) */
+/** Nutrition pillar — Items / Programs catalog (mock items + programs) */
 function NutritionCatalogModal({ onClose, onSelectItem, onSelectProgram }) {
   const [search, setSearch] = useState("");
   const [catF, setCatF] = useState("all");
@@ -1272,7 +1190,7 @@ function NutritionCatalogModal({ onClose, onSelectItem, onSelectProgram }) {
         </div>
         <div style={S.modalB}>
           <input style={S.srch} placeholder="Search items or programs" value={search} onChange={(e) => setSearch(e.target.value)} autoFocus />
-          <div style={segShell} role="tablist" aria-label="Nutrition catalogue">
+          <div style={segShell} role="tablist" aria-label="Nutrition catalog">
             <button type="button" role="tab" aria-selected={listMode === "items"} style={segBtn(listMode === "items")} onClick={() => setListMode("items")}>
               Items
             </button>
@@ -1527,8 +1445,7 @@ function SupplementItem({ item, onChange, onRemove }) {
             <textarea style={S.ta} value={item.instructions || ""} onChange={(e) => u("instructions", e.target.value)} />
           </div>
         </div>
-        <div style={S.ctxBox}>
-          <div style={{ ...S.lbl, marginBottom: 16 }}>Context fields</div>
+        <ContextFieldsCollapsible boxStyle={S.ctxBox}>
           <div style={{ marginBottom: 16 }}>
             <div style={S.fldF}>
               <label style={S.lbl}>The what</label>
@@ -1545,7 +1462,7 @@ function SupplementItem({ item, onChange, onRemove }) {
             <label style={S.lbl}>The why</label>
             <textarea style={S.ta} placeholder="Why is this included in the protocol? What's the clinical rationale?" value={item.context_why || ""} onChange={(e) => u("context_why", e.target.value)} />
           </div>
-        </div>
+        </ContextFieldsCollapsible>
       </div>
     </div>
   );
@@ -1699,8 +1616,7 @@ function RecoveryServiceItem({ item, onChange, onRemove, accentColor = PILLARS.r
           </div>
         </div>
 
-        <div style={ctxBoxRecovery}>
-          <div style={{ ...S.lbl, marginBottom: 16 }}>Context fields</div>
+        <ContextFieldsCollapsible boxStyle={ctxBoxRecovery}>
           <div style={{ marginBottom: 16 }}>
             <div style={S.fldF}>
               <label style={S.lbl}>The what</label>
@@ -1717,7 +1633,7 @@ function RecoveryServiceItem({ item, onChange, onRemove, accentColor = PILLARS.r
             <label style={S.lbl}>The why</label>
             <textarea style={S.ta} placeholder="Why is this included in the protocol? What's the clinical rationale?" value={item.context_why || ""} onChange={(e) => u("context_why", e.target.value)} />
           </div>
-        </div>
+        </ContextFieldsCollapsible>
       </div>
     </div>
   );
@@ -1860,8 +1776,7 @@ function NutritionItemCard({ item, onChange, onRemove, accentColor = PILLARS.nut
           </div>
         </div>
 
-        <div style={ctxBox}>
-          <div style={{ ...S.lbl, marginBottom: 16 }}>Context fields</div>
+        <ContextFieldsCollapsible boxStyle={ctxBox}>
           <div style={{ marginBottom: 16 }}>
             <div style={S.fldF}>
               <label style={S.lbl}>The what</label>
@@ -1878,7 +1793,7 @@ function NutritionItemCard({ item, onChange, onRemove, accentColor = PILLARS.nut
             <label style={S.lbl}>The why</label>
             <textarea style={S.ta} placeholder="Why is this included in the protocol? What's the clinical rationale?" value={item.context_why || ""} onChange={(e) => u("context_why", e.target.value)} />
           </div>
-        </div>
+        </ContextFieldsCollapsible>
       </div>
     </div>
   );
@@ -2181,15 +2096,14 @@ function TrainingItemCard({ item, onChange, onRemove, onAddExercise, onAddFromCa
               </button>
               {onAddFromCatalog && (
                 <button type="button" style={S.btnAddCatalog} onClick={onAddFromCatalog}>
-                  + Add from catalogue
+                  + Add from catalog
                 </button>
               )}
             </div>
           </div>
         </div>
 
-        <div style={ctxBoxTraining}>
-          <div style={{ ...S.lbl, marginBottom: 16 }}>Context fields</div>
+        <ContextFieldsCollapsible boxStyle={ctxBoxTraining}>
           <div style={{ marginBottom: 16 }}>
             <div style={S.fldF}>
               <label style={S.lbl}>The what</label>
@@ -2206,13 +2120,13 @@ function TrainingItemCard({ item, onChange, onRemove, onAddExercise, onAddFromCa
             <label style={S.lbl}>The why</label>
             <textarea style={S.ta} placeholder="Why is this included in the protocol? What's the clinical rationale?" value={item.context_why || ""} onChange={(e) => u("context_why", e.target.value)} />
           </div>
-        </div>
+        </ContextFieldsCollapsible>
       </div>
     </div>
   );
 }
 
-export default function ProtocolBuilder({ variant = "default" }) {
+export default function ProtocolBuilder({ variant = "default", initialTemplateId = null, catalogProtocolRow = null }) {
   const router = useRouter();
   const isCareReview = variant === "care-review";
   const [meta, setMeta] = useState({ name: "", clinical_objective: "", clinical_use_case: "", eligibility_criteria: "", contraindications: "", duration: "", status: "draft" });
@@ -2391,7 +2305,7 @@ export default function ProtocolBuilder({ variant = "default" }) {
     );
   };
 
-  /** Prepends a blank training row then opens the Items / Programs catalogue for that row */
+  /** Prepends a blank training row then opens the Items / Programs catalog for that row */
   const addTrainingItemAndOpenCatalog = (secId) => {
     const newId = gid();
     const blank = {
@@ -2482,7 +2396,7 @@ export default function ProtocolBuilder({ variant = "default" }) {
   };
 
   const loadTemplate = (t) => {
-    setMeta({ ...meta, name: t.name, clinical_objective: t.description });
+    setMeta((m) => ({ ...m, name: t.name, clinical_objective: t.description }));
     if (t.id === "pt-001") {
       setSections([
         { id: gid(), pillar: "supplements", name: "Core antiparasitics", items: [
@@ -2993,6 +2907,24 @@ export default function ProtocolBuilder({ variant = "default" }) {
     setTemplateModal(false);
   };
 
+  const initialBootstrapRef = useRef(false);
+  useLayoutEffect(() => {
+    if (initialBootstrapRef.current) return;
+    if (!initialTemplateId && !catalogProtocolRow) return;
+    initialBootstrapRef.current = true;
+    if (initialTemplateId) {
+      const t = MOCK_TEMPLATES.find((x) => x.id === initialTemplateId);
+      if (t) loadTemplate(t);
+    }
+    if (catalogProtocolRow) {
+      setMeta((m) => ({
+        ...m,
+        name: catalogProtocolRow.name || m.name,
+        status: catalogProtocolRow.status || m.status,
+      }));
+    }
+  }, [initialTemplateId, catalogProtocolRow]);
+
   useEffect(() => {
     if (!isCareReview || careReviewBootstrap.current) return;
     careReviewBootstrap.current = true;
@@ -3171,7 +3103,7 @@ export default function ProtocolBuilder({ variant = "default" }) {
                               setCatalogModal("supplements");
                             }}
                           >
-                            + Add from catalogue
+                            + Add from catalog
                           </button>
                         </div>
                       </>
@@ -3196,7 +3128,7 @@ export default function ProtocolBuilder({ variant = "default" }) {
                             + Add New
                           </button>
                           <button type="button" style={S.btnAddCatalog} onClick={() => addNutritionItemAndOpenCatalog(sec.id)}>
-                            + Add from catalogue
+                            + Add from catalog
                           </button>
                         </div>
                       </>
@@ -3224,7 +3156,7 @@ export default function ProtocolBuilder({ variant = "default" }) {
                             + Add New
                           </button>
                           <button type="button" style={S.btnAddCatalog} onClick={() => addTrainingItemAndOpenCatalog(sec.id)}>
-                            + Add from catalogue
+                            + Add from catalog
                           </button>
                         </div>
                       </>
@@ -3246,7 +3178,7 @@ export default function ProtocolBuilder({ variant = "default" }) {
                               setCatalogModal("services");
                             }}
                           >
-                            + Add from catalogue
+                            + Add from catalog
                           </button>
                         </div>
                       </>
@@ -3275,7 +3207,7 @@ export default function ProtocolBuilder({ variant = "default" }) {
                               setCatalogModal("services");
                             }}
                           >
-                            + Add from catalogue
+                            + Add from catalog
                           </button>
                         </div>
                       </>
@@ -3304,7 +3236,7 @@ export default function ProtocolBuilder({ variant = "default" }) {
                               setCatalogModal("services");
                             }}
                           >
-                            + Add from catalogue
+                            + Add from catalog
                           </button>
                         </div>
                       </>

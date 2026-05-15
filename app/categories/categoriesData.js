@@ -44,6 +44,16 @@ export const PILLAR_TAG_ORDER = /** @type {const} */ ([
   "regeneration",
 ]);
 
+/** Create Item menu order (items list) — Regeneration before Recovery */
+export const CREATE_ITEM_PILLAR_ORDER = /** @type {const} */ ([
+  "supplements",
+  "nutrition",
+  "training",
+  "regeneration",
+  "recovery",
+  "diagnostics",
+]);
+
 /** @type {{ id: string, pillarKey: PillarKey, category: string, itemsInside: number }[]} */
 export const CATEGORIES_MOCK = [
   { category: "Systemic Formulas", itemsInside: 49 },

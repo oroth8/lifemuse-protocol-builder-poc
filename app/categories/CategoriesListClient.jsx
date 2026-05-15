@@ -165,12 +165,7 @@ export function CategoriesListClient({ initialRows }) {
 
       <div className="flex-1 overflow-auto p-6 lg:p-8">
         <div className="mx-auto max-w-6xl space-y-6">
-          <PageBreadcrumb
-            crumbs={[
-              { label: "Home", href: "/dashboard" },
-              { label: "Items", href: "/items" },
-            ]}
-          />
+          <PageBreadcrumb crumbs={[{ label: "Home", href: "/dashboard" }, { label: "Categories" }]} />
 
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>

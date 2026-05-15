@@ -1,5 +1,5 @@
-import Link from "next/link";
 import { AppShell } from "../components/AppShell";
+import { PageBreadcrumb } from "../components/PageBreadcrumb";
 import { MEMBERS } from "./data";
 import { MembersTable } from "./MembersTable";
 
@@ -24,30 +24,23 @@ export default function MembersPage() {
   return (
     <AppShell mainClassName="flex min-h-screen min-w-0 flex-1 flex-col bg-[#f4f4f4]">
       <div className="flex-1 overflow-auto p-6 lg:p-8">
-        <div className="mx-auto max-w-6xl">
-          <nav className="text-sm" aria-label="Breadcrumb">
-            <ol className="flex flex-wrap items-center gap-2">
-              <li>
-                <Link href="/dashboard" className="text-blue-600 hover:text-blue-700 hover:underline">
-                  Home
-                </Link>
-              </li>
-              <li className="text-gray-400" aria-hidden>
-                &gt;
-              </li>
-              <li className="font-medium text-gray-600">Members</li>
-            </ol>
-          </nav>
+        <div className="mx-auto max-w-6xl space-y-6">
+          <PageBreadcrumb crumbs={[{ label: "Home", href: "/dashboard" }, { label: "Members" }]} />
 
-          <div className="mt-5 flex flex-col gap-4 sm:mt-6 sm:flex-row sm:items-center sm:justify-between">
-            <h1 className="text-3xl font-bold tracking-tight text-gray-900">Members</h1>
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight text-gray-900 sm:text-3xl">Members</h1>
+              <p className="mt-1 text-sm text-gray-600">
+                Browse members and open a profile to manage care plans, progress notes, and related records.
+              </p>
+            </div>
             <button type="button" className="btn-lifemuse-primary gap-2">
               <IconPlus />
               Create new member
             </button>
           </div>
 
-          <section className="mt-6 overflow-hidden rounded-xl border border-gray-200/80 bg-white shadow-[0_1px_3px_rgba(0,0,0,0.06),0_4px_12px_rgba(0,0,0,0.04)]">
+          <section className="overflow-hidden rounded-xl border border-gray-200/80 bg-white shadow-[0_1px_3px_rgba(0,0,0,0.06),0_4px_12px_rgba(0,0,0,0.04)]">
             <div className="border-b border-gray-100 px-4 py-3 sm:px-5">
               <label className="relative block max-w-md">
                 <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">

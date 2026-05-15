@@ -15,17 +15,13 @@ function StatusBadge({ status }) {
   const isApproved = String(status).toLowerCase().includes("approved") && !String(status).toLowerCase().includes("awaiting");
   if (isApproved) {
     return (
-      <span className="inline-flex items-center gap-2 rounded-full border border-emerald-200/90 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-900">
-        <span className="h-2 w-2 rounded-full bg-emerald-500" aria-hidden />
+      <span className="inline-flex items-center rounded-full border border-emerald-200/90 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-900">
         {status}
       </span>
     );
   }
   return (
-    <span className="inline-flex items-center gap-2 rounded-full border border-amber-200/80 bg-amber-50 px-3 py-1 text-xs font-medium text-amber-900">
-      <span className="h-2 w-2 rounded-full bg-amber-400" aria-hidden />
-      {status}
-    </span>
+    <span className="inline-flex items-center rounded-[10px] bg-[#FFCC00]/10 px-3 py-1 text-xs font-bold text-[#A5650C]">{status}</span>
   );
 }
 

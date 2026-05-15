@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { PILLAR_META } from "../categories/categoriesData";
 import { PageBreadcrumb } from "../components/PageBreadcrumb";
+import { CreateItemPillarMenu } from "../components/CreateItemPillarMenu";
 import { SortableTh } from "../components/SortableTh";
 import { TablePagination } from "../components/TablePagination";
 import { useTableSort } from "../hooks/useTableSort";
@@ -238,9 +239,7 @@ export function ItemsListClient({ initialRows }) {
                 Manage individual items that can be grouped into programs and added to protocols.
               </p>
             </div>
-            <Link href="/items/new" className="btn-lifemuse-primary shrink-0 self-start sm:self-center">
-              Create Item
-            </Link>
+            <CreateItemPillarMenu />
           </div>
 
           <section className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">

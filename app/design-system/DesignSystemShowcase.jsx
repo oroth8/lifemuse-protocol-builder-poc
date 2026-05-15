@@ -2,8 +2,13 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { PILLAR_META, PILLAR_TAG_ORDER } from "../categories/categoriesData";
 import { AppShell } from "../components/AppShell";
+import { CreateItemPillarMenu } from "../components/CreateItemPillarMenu";
+import { CustomRecurrenceModal } from "../components/CustomRecurrenceModal";
 import { FieldLabel } from "../components/FieldLabel";
+import { PageBreadcrumb } from "../components/PageBreadcrumb";
+import { DEFAULT_SUPPLEMENT_ICON_ID, SupplementIconGlyph } from "../components/protocolSupplementIcons";
 import { SortableTh } from "../components/SortableTh";
 import { TablePagination } from "../components/TablePagination";
 import { CarePlanStatusBadge } from "../members/CarePlanStatusBadge";
@@ -84,27 +89,23 @@ function DemoSortTable({ detail, title }) {
 
 export function DesignSystemShowcase() {
   const [page, setPage] = useState(1);
+  const [demoPillarPick, setDemoPillarPick] = useState(/** @type {string | null} */ (null));
+  const [recModalOpen, setRecModalOpen] = useState(false);
 
   return (
     <AppShell mainClassName="flex min-h-screen min-w-0 flex-1 flex-col bg-[#f4f4f4]">
       <div className="flex-1 overflow-auto p-6 lg:p-8">
         <div className="mx-auto max-w-5xl space-y-8">
           <header className="space-y-2">
-            <nav className="text-sm text-gray-500" aria-label="Breadcrumb">
-              <ol className="flex flex-wrap items-center gap-2">
-                <li>
-                  <Link href="/dashboard" className="text-blue-600 hover:text-blue-700 hover:underline">
-                    Home
-                  </Link>
-                </li>
-                <li aria-hidden>/</li>
-                <li className="font-medium text-gray-900">Design system</li>
-              </ol>
-            </nav>
+            <PageBreadcrumb crumbs={[{ label: "Home", href: "/dashboard" }, { label: "Design system" }]} />
             <h1 className="text-2xl font-bold tracking-tight text-gray-900 sm:text-3xl">LIFEMUSE — component reference</h1>
             <p className="max-w-2xl text-sm text-gray-600">
               Each block mirrors classes in use today. Prefer <code className="rounded bg-gray-100 px-1.5 py-0.5 text-xs">globals.css</code>{" "}
-              utilities for new UI; legacy patterns are marked for eventual consolidation.
+              utilities for new UI; legacy patterns are marked for eventual consolidation.{" "}
+              <a href="#reusable" className="text-blue-600 hover:underline">
+                Reusable components
+              </a>{" "}
+              lists extracted pieces to import on new screens.
             </p>
           </header>
 
@@ -153,7 +154,7 @@ export function DesignSystemShowcase() {
                 Dashboard link pattern
               </Link>
             </p>
-            <Source>Members, reminders, design-system breadcrumbs.</Source>
+            <Source>Main views use <code className="text-gray-700">PageBreadcrumb</code> (book icon + chevrons).</Source>
           </Section>
 
           <Section id="buttons" title="Buttons">
@@ -365,8 +366,8 @@ export function DesignSystemShowcase() {
                 <span className="h-2 w-2 rounded-full bg-emerald-500" aria-hidden />
                 Approved
               </span>
-              <span className="inline-flex items-center gap-2 rounded-full border border-amber-200/80 bg-amber-50 px-3 py-1 text-xs font-medium text-amber-900">
-                <span className="h-2 w-2 rounded-full bg-amber-400" aria-hidden />
+              <span className="inline-flex items-center gap-2 rounded-[10px] bg-[#FFCC00]/10 px-3 py-1 text-xs font-bold text-[#A5650C]">
+                <span className="h-2 w-2 shrink-0 rounded-full bg-[#A5650C]" aria-hidden />
                 Awaiting Approval
               </span>
             </div>
@@ -465,6 +466,119 @@ export function DesignSystemShowcase() {
             <div className="overflow-hidden rounded-lg border border-gray-200 bg-white p-3 text-sm text-gray-600">
               <code className="text-xs">RichTextEditor.jsx</code> shell — <code className="text-xs">rounded-lg border border-gray-200 bg-white</code>
             </div>
+          </Section>
+
+          <Section id="reusable" title="Reusable components (extracted)">
+            <p className="text-sm text-gray-600">
+              Prefer importing these for new screens so behavior (a11y, keyboard, routing) stays consistent. Demos below use{" "}
+              <code className="rounded bg-gray-100 px-1 text-xs">onSelectPillar</code> or local state instead of navigating away.
+            </p>
+
+            <Sub>CreateItemPillarMenu</Sub>
+            <div className="flex flex-wrap items-center gap-4">
+              <CreateItemPillarMenu
+                menuId="ds-create-item-menu"
+                triggerId="ds-create-item-trigger"
+                onSelectPillar={(k) => setDemoPillarPick(k)}
+              />
+              {demoPillarPick ? (
+                <span className="text-xs text-gray-600">
+                  Demo selection: <strong className="text-gray-900">{demoPillarPick}</strong> (production omits <code className="text-xs">onSelectPillar</code> → navigates to{" "}
+                  <code className="text-xs">/items/new?pillar=…</code>)
+                </span>
+              ) : null}
+            </div>
+            <Source>
+              <code className="text-gray-700">CreateItemPillarMenu.jsx</code> — pillar order <code className="text-gray-700">CREATE_ITEM_PILLAR_ORDER</code> in{" "}
+              <code className="text-gray-700">categoriesData.js</code>.
+            </Source>
+
+            <Sub>PageBreadcrumb</Sub>
+            <PageBreadcrumb crumbs={[{ label: "Home", href: "/dashboard" }, { label: "Design system" }]} />
+            <Source>
+              <code className="text-gray-700">PageBreadcrumb.jsx</code> — items, reminders, categories; book icon + chevrons.
+            </Source>
+
+            <Sub>CustomRecurrenceModal</Sub>
+            <p className="text-sm text-gray-600">Used for supplement custom recurrence in the protocol builder and item form.</p>
+            <button type="button" className="btn-lifemuse-secondary" onClick={() => setRecModalOpen(true)}>
+              Open sample modal
+            </button>
+            {recModalOpen ? (
+              <CustomRecurrenceModal
+                initial={null}
+                onDone={() => setRecModalOpen(false)}
+                onCancel={() => setRecModalOpen(false)}
+              />
+            ) : null}
+            <Source>
+              <code className="text-gray-700">CustomRecurrenceModal.jsx</code> — data shape from <code className="text-gray-700">app/lib/customRecurrence.js</code>.
+            </Source>
+
+            <Sub>Pillar tags</Sub>
+            <div className="flex flex-wrap gap-2">
+              {PILLAR_TAG_ORDER.map((k) => (
+                <span key={k} className={PILLAR_META[k].className}>
+                  {PILLAR_META[k].label}
+                </span>
+              ))}
+            </div>
+            <Source>
+              <code className="text-gray-700">PILLAR_META</code> / <code className="text-gray-700">PILLAR_TAG_ORDER</code> in <code className="text-gray-700">categoriesData.js</code>.
+            </Source>
+
+            <Sub>Supplement icon glyph (picker set)</Sub>
+            <div className="flex items-center gap-3 rounded-lg border border-gray-100 bg-gray-50/80 p-3">
+              <SupplementIconGlyph id={DEFAULT_SUPPLEMENT_ICON_ID} size={28} />
+              <span className="text-xs text-gray-600">
+                Default <code className="text-xs">icon_id</code> — <code className="text-xs">protocolSupplementIcons.jsx</code>
+              </span>
+            </div>
+
+            <Sub>Item / protocol chrome (reference)</Sub>
+            <p className="text-sm text-gray-600">
+              Items create/edit header and protocol builder top bar share this language: white strip, border <code className="text-xs">#D8DDEA</code>, primary{" "}
+              <code className="text-xs">#5B5FED</code>, muted secondary.
+            </p>
+            <div className="max-w-4xl rounded-lg border border-gray-200 bg-[#f4f4f4] p-3">
+              <header className="flex w-full items-center justify-between gap-4 border-b border-[#D8DDEA] bg-white px-4 py-4 sm:px-7">
+                <div className="flex min-w-0 items-center gap-3">
+                  <span
+                    className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[#D8DDEA] bg-white text-[#5E6980]"
+                    aria-hidden
+                  >
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+                      <path d="M15 18l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </span>
+                  <div className="min-w-0">
+                    <h2 className="text-[15px] font-semibold tracking-tight text-[#1B2230]">Create Item</h2>
+                    <p className="mt-0.5 text-xs leading-snug">
+                      <span className="font-medium text-[#5E6980]">Pillar — </span>
+                      <span className="font-semibold text-[#378ADD]">Regeneration</span>
+                    </p>
+                  </div>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  <button
+                    type="button"
+                    className="inline-flex items-center justify-center rounded-lg border border-[#D8DDEA] bg-transparent px-[18px] py-2 text-[13px] font-medium text-[#5E6980] hover:bg-[#F3F5FB]"
+                  >
+                    Save draft
+                  </button>
+                  <button
+                    type="button"
+                    className="inline-flex items-center justify-center rounded-lg border-0 bg-[#5B5FED] px-[18px] py-2 text-[13px] font-semibold text-white hover:opacity-90"
+                  >
+                    Save Item
+                  </button>
+                </div>
+              </header>
+              <p className="mt-2 px-1 text-[11px] text-gray-500">Gray area represents scrollable page body.</p>
+            </div>
+            <Source>
+              <code className="text-gray-700">ItemFormClient.jsx</code> header, <code className="text-gray-700">ProtocolBuilder.jsx</code> <code className="text-gray-700">S.topBar</code> (inline styles there — consider extracting to shared layout later).
+            </Source>
           </Section>
         </div>
       </div>

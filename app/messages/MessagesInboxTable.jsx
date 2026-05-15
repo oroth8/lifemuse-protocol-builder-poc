@@ -17,20 +17,18 @@ function IconChevron() {
   );
 }
 
-function protocolValue(row, key) {
-  if (key === "updated") return parseDateish(row.updated);
-  if (key === "id") {
-    const n = parseInt(String(row.id).replace(/\D/g, ""), 10);
-    return Number.isNaN(n) ? row.id : n;
-  }
-  return String(row[key] ?? "").toLowerCase();
+function inboxValue(row, key) {
+  if (key === "date") return parseDateish(row.lastAtISO);
+  if (key === "from") return String(row.lastFrom ?? "").toLowerCase();
+  if (key === "message") return String(row.preview ?? "").toLowerCase();
+  return "";
 }
 
-export function ProtocolsTable({ rows }) {
+export function MessagesInboxTable({ rows }) {
   const scrollAnchorRef = useRef(null);
   const router = useRouter();
-  const { sortKey, sortDir, toggleSort } = useTableSort("updated", "desc");
-  const sorted = useMemo(() => sortRows(rows, sortKey, sortDir, protocolValue), [rows, sortKey, sortDir]);
+  const { sortKey, sortDir, toggleSort } = useTableSort("date", "desc");
+  const sorted = useMemo(() => sortRows(rows, sortKey, sortDir, inboxValue), [rows, sortKey, sortDir]);
   const [page, setPage] = useState(1);
   const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
   const currentPage = Math.min(Math.max(1, page), totalPages);
@@ -54,24 +52,23 @@ export function ProtocolsTable({ rows }) {
         <table className="w-full min-w-[640px] text-left text-sm">
           <thead>
             <tr className="border-b border-gray-100 bg-gray-50/80 text-xs font-medium uppercase tracking-wide text-gray-500">
-              <SortableTh columnKey="id" label="ID" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} className="px-6 py-3" />
-              <SortableTh columnKey="name" label="Name" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} className="px-6 py-3" />
-              <SortableTh columnKey="version" label="Version" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} className="px-6 py-3" />
-              <SortableTh columnKey="updated" label="Updated" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} className="px-6 py-3" />
-              <SortableTh columnKey="status" label="Status" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} className="px-6 py-3" />
+              <SortableTh columnKey="date" label="Date" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} className="px-6 py-3" />
+              <SortableTh columnKey="from" label="From" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} className="px-6 py-3" />
+              <SortableTh columnKey="message" label="Message" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} className="px-6 py-3" />
               <th className="w-12 px-6 py-3" aria-hidden />
             </tr>
           </thead>
           <tbody>
             {pageSlice.map((row, i) => {
-              const href = `/protocols/${encodeURIComponent(row.id)}`;
+              const href = `/messages/${encodeURIComponent(row.threadId)}`;
+              const strong = row.unread ? "font-semibold text-gray-900" : "text-gray-600";
               return (
                 <tr
-                  key={row.id}
+                  key={row.threadId}
                   role="link"
                   tabIndex={0}
-                  aria-label={`Open protocol ${row.name}`}
-                  className={`cursor-pointer border-b border-gray-100 ${i % 2 === 0 ? "bg-white" : "bg-gray-100"} hover:bg-gray-200/70`}
+                  aria-label={`Open messages with ${row.memberName}`}
+                  className={`cursor-pointer border-b border-gray-100 ${i % 2 === 0 ? "bg-white" : "bg-gray-50/60"} hover:bg-gray-100/80`}
                   onClick={() => router.push(href)}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" || e.key === " ") {
@@ -80,13 +77,9 @@ export function ProtocolsTable({ rows }) {
                     }
                   }}
                 >
-                  <td className="whitespace-nowrap px-6 py-3.5 font-medium text-gray-900">{row.id}</td>
-                  <td className="px-6 py-3.5 text-gray-900">{row.name}</td>
-                  <td className="whitespace-nowrap px-6 py-3.5 text-gray-600">{row.version}</td>
-                  <td className="whitespace-nowrap px-6 py-3.5 text-gray-600">{row.updated}</td>
-                  <td className="whitespace-nowrap px-6 py-3.5">
-                    <span className="rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-xs font-medium text-gray-700">{row.status}</span>
-                  </td>
+                  <td className={`whitespace-nowrap px-6 py-3.5 ${strong}`}>{row.displayDate}</td>
+                  <td className={`whitespace-nowrap px-6 py-3.5 ${row.unread ? "font-semibold text-gray-900" : "text-gray-600"}`}>{row.lastFrom}</td>
+                  <td className={`min-w-0 max-w-md truncate px-6 py-3.5 ${row.unread ? "font-semibold text-gray-900" : "text-gray-600"}`}>{row.preview}</td>
                   <td className="px-6 py-3.5">
                     <span className="flex rounded p-1 text-gray-400" aria-hidden>
                       <IconChevron />
@@ -103,7 +96,7 @@ export function ProtocolsTable({ rows }) {
         totalPages={totalPages}
         onPageChange={setPage}
         scrollAnchorRef={scrollAnchorRef}
-        ariaLabel="Protocols pagination"
+        ariaLabel="Messages inbox pagination"
       />
     </div>
   );

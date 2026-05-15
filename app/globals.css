@@ -62,3 +62,13 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/**
+ * Next.js injects <nextjs-portal> for dev tools / overlays. Browser preview tweaks
+ * cleared inline left/top (0px); mirror that here so positioning isn’t pinned to the corner.
+ * Remove this block if the dev overlay misbehaves.
+ */
+nextjs-portal {
+  left: unset !important;
+  top: unset !important;
+}

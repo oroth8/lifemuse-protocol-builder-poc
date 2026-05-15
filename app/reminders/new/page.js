@@ -9,14 +9,14 @@ export default function NewReminderPage() {
         crumbs={[
           { label: "Home", href: "/dashboard" },
           { label: "Reminders", href: "/reminders" },
-          { label: "Create Reminder" },
+          { label: "Create New Reminder" },
         ]}
       />
 
       <div className="flex-1 overflow-auto p-6 lg:p-8">
         <div className="mx-auto max-w-6xl space-y-6">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-gray-900 sm:text-3xl">Create Reminder</h1>
+            <h1 className="text-2xl font-bold tracking-tight text-gray-900 sm:text-3xl">Create New Reminder</h1>
             <p className="mt-2 max-w-3xl text-sm leading-relaxed text-gray-600 sm:text-base">
               Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore
               magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris.
