@@ -14,7 +14,20 @@ pnpm dev
 bun dev
 ```
 
+Run these commands from **this project folder** (the one that contains `package.json`). Other folders in the same parent directory may be static sites without Node tooling; `npm run dev` there will fail with a missing `package.json` error.
+
+`npm run dev` uses webpack by default to avoid Turbopack persistence issues on some macOS setups. Use `npm run dev:turbo` if you prefer Turbopack.
+
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+
+## Local disk cleanup
+
+Build output and dependencies are gitignored but can grow large on disk. From this project root, with the dev server stopped:
+
+```bash
+rm -rf .next
+rm -rf node_modules && npm ci
+```
 
 You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
 
